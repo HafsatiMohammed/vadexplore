@@ -1,0 +1,56 @@
+{
+  "run": "thor_demo",
+  "device": "mps",
+  "device_name": "mps: Apple Silicon, arm64",
+  "core": "bigru",
+  "batch_size": 8,
+  "epochs_run": 3,
+  "epochs_configured": 3,
+  "total_seconds": 49.18316388130188,
+  "total_human": "49.2s",
+  "train": {
+    "total_seconds": 39.91213035583496,
+    "mean_epoch_seconds": 13.304043451944986,
+    "clips_per_second": 4.509907098298622,
+    "frames_per_second": 5748.928908437863
+  },
+  "val": {
+    "total_seconds": 9.239237070083618,
+    "mean_epoch_seconds": 3.0797456900278726,
+    "clips_per_second": 19.48212808423704,
+    "frames_per_second": 20620.858470760693
+  },
+  "overhead_seconds": 0.03179645538330078,
+  "per_epoch": [
+    {
+      "epoch": 1,
+      "train_seconds": 13.970275163650513,
+      "val_seconds": 3.2786550521850586,
+      "seconds": 17.24893021583557,
+      "train_clips_per_second": 4.294833086474559,
+      "train_frames_per_second": 5474.766896432002,
+      "val_clips_per_second": 18.30018682813644,
+      "val_frames_per_second": 19369.832748241013
+    },
+    {
+      "epoch": 2,
+      "train_seconds": 12.789844036102295,
+      "val_seconds": 2.9766600131988525,
+      "seconds": 15.766504049301147,
+      "train_clips_per_second": 4.691222178365593,
+      "train_frames_per_second": 5980.057284835234,
+      "val_clips_per_second": 20.156819970689668,
+      "val_frames_per_second": 21334.986097976478
+    },
+    {
+      "epoch": 3,
+      "train_seconds": 13.152011156082153,
+      "val_seconds": 2.983922004699707,
+      "seconds": 16.13593316078186,
+      "train_clips_per_second": 4.562039925905398,
+      "train_frames_per_second": 5815.384361549141,
+      "val_clips_per_second": 20.10776417932486,
+      "val_frames_per_second": 21283.0629956064
+    }
+  ]
+}

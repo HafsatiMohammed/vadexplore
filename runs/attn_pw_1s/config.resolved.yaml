@@ -1,0 +1,73 @@
+name: attn_pw_1s
+seed: 0
+device: mps
+progress: auto
+out_root: runs
+data:
+  split: splits/split.json
+  feature_stats: splits/feature_stats.json
+  label: bridged
+  bridge_gap_s: 0.1
+  highpass_hz: 80.0
+  highpass_order: 2
+  cache_features: true
+  limit_clips: null
+model:
+  core: causal_attn
+  d_model: 128
+  conv_channels:
+  - 32
+  - 64
+  - 64
+  causal_frontend: true
+  dropout: 0.1
+  gru_hidden: 64
+  gru_layers: 2
+  causal: false
+  attn_layers: 2
+  attn_heads: 4
+  attn_ff_ratio: 2
+  attn_dropout: 0.1
+  lookahead_frames: 5
+  past_window_frames: 50
+augment:
+  enabled: false
+  rir_dir: ~/Documents/research_training/kws-augmentation-kit/rirs
+  musan_dir: ~/Documents/research_training/kws-augmentation-kit/musan
+  rir_split: train
+  musan_split: train
+  preserve_level: true
+  reverb_prob: 0.5
+  noise_prob: 0.8
+  noise_rir_prob: 0.5
+  snr_db_range:
+  - 0.0
+  - 20.0
+  seed: 0
+loss:
+  weighting: inverse_freq
+optim:
+  batch_size: 8
+  epochs: 30
+  lr: 0.001
+  weight_decay: 0.01
+  grad_clip: 1.0
+  scheduler: cosine
+  min_lr: 1.0e-05
+eval:
+  select_on: frr_at_fa
+  target_fa_per_hour: 100.0
+  min_fa_frames: 3
+  n_thresholds: 101
+  early_stopping_patience: 8
+_resolved:
+  device: mps
+  device_name: 'mps: Apple Silicon, arm64'
+  pos_weight: 0.23263380003534045
+  selection_metric: frr_at_fa
+  selection_direction: lower is better
+  n_train_clips: 673
+  n_val_clips: 148
+  n_parameters: 362497
+  augmentation:
+    enabled: false

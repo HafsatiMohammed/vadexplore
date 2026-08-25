@@ -1,0 +1,103 @@
+{
+  "settings": {
+    "label": "bridged",
+    "lookahead_frames": 5,
+    "attn_layers": 2,
+    "epochs": 12,
+    "seed": 0,
+    "fps": 100,
+    "limit_clips": null,
+    "tolerance_points": 0.3
+  },
+  "results": [
+    {
+      "window": 0.5,
+      "run": "attn_pw_0.5s",
+      "per_layer_frames": 25,
+      "effective_frames": 50,
+      "effective_seconds": 0.5,
+      "kv_cache_floats": 15872,
+      "total_seconds": 568.6710171699524,
+      "epoch": 8,
+      "eer": 0.033290866738827724,
+      "auc": 0.989718497777895,
+      "frr_at_fa": 0.07427280625543006,
+      "fa_per_hour": 94.4738622314493,
+      "val_loss": 0.03622360669267882,
+      "n_epochs": 12
+    },
+    {
+      "window": 1.0,
+      "run": "attn_pw_1s",
+      "per_layer_frames": 50,
+      "effective_frames": 100,
+      "effective_seconds": 1.0,
+      "kv_cache_floats": 28672,
+      "total_seconds": 304.67468905448914,
+      "epoch": 8,
+      "eer": 0.03268056109602798,
+      "auc": 0.9898876718193926,
+      "frr_at_fa": 0.062498696785404,
+      "fa_per_hour": 96.57328139214817,
+      "val_loss": 0.036404110888264826,
+      "n_epochs": 12
+    },
+    {
+      "window": 2.0,
+      "run": "attn_pw_2s",
+      "per_layer_frames": 100,
+      "effective_frames": 200,
+      "effective_seconds": 2.0,
+      "kv_cache_floats": 54272,
+      "total_seconds": 304.3588948249817,
+      "epoch": 8,
+      "eer": 0.03224423761576274,
+      "auc": 0.9902364211926368,
+      "frr_at_fa": 0.07432145960034753,
+      "fa_per_hour": 98.67270055284705,
+      "val_loss": 0.036119013046871866,
+      "n_epochs": 12
+    },
+    {
+      "window": 4.0,
+      "run": "attn_pw_4s",
+      "per_layer_frames": 200,
+      "effective_frames": 400,
+      "effective_seconds": 4.0,
+      "kv_cache_floats": 105472,
+      "total_seconds": 279.0630609989166,
+      "epoch": 10,
+      "eer": 0.03564299106376575,
+      "auc": 0.9892050242705481,
+      "frr_at_fa": 0.09795308427454387,
+      "fa_per_hour": 88.17560474935269,
+      "val_loss": 0.038111280026364665,
+      "n_epochs": 12
+    },
+    {
+      "window": "unbounded",
+      "run": "attn_pw_unbounded",
+      "per_layer_frames": null,
+      "effective_frames": null,
+      "effective_seconds": null,
+      "kv_cache_floats": null,
+      "total_seconds": 273.52431893348694,
+      "epoch": 10,
+      "eer": 0.03666455442330735,
+      "auc": 0.9890222577525947,
+      "frr_at_fa": 0.12116768027801911,
+      "fa_per_hour": 92.37444307075043,
+      "val_loss": 0.03949873560164099,
+      "n_epochs": 12
+    }
+  ],
+  "elbow": {
+    "found": true,
+    "window_s": 0.5,
+    "eer_points_above_unbounded": -0.33736876844796226,
+    "tolerance_points": 0.3,
+    "per_layer_frames": 25,
+    "effective_frames": 50
+  },
+  "best_epoch_selection": "lowest validation EER across epochs"
+}

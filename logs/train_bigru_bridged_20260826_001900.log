@@ -1,0 +1,31 @@
+run bigru_bridged  core bigru  label bridged
+  device mps: Apple Silicon, arm64
+  246,529 parameters, 673 train clips, 148 val clips
+  pos_weight 0.2326 (inverse_freq), selecting on frr_at_fa (lower is better)
+  first epoch took 2m 34.3s (train 2m 25.2s, val 9.1s); estimated total for 30 epochs 77m 09.1s
+  epoch   1  train 0.0471  val 0.0388  eer  3.85%  auc 0.9912  frr@fa  7.43%  (92.4 fa/h)  145.2s+9.1s  *
+  epoch   2  train 0.0351  val 0.0342  eer  3.40%  auc 0.9926  frr@fa  6.23%  (94.5 fa/h)  142.7s+8.7s  *
+  epoch   3  train 0.0325  val 0.0342  eer  3.43%  auc 0.9933  frr@fa  6.21%  (90.3 fa/h)  143.3s+8.4s  *
+  epoch   4  train 0.0316  val 0.0340  eer  3.19%  auc 0.9937  frr@fa  5.04%  (94.5 fa/h)  143.0s+8.9s  *
+  epoch   5  train 0.0300  val 0.0299  eer  3.03%  auc 0.9943  frr@fa  4.99%  (84.0 fa/h)  143.3s+8.8s  *
+  epoch   6  train 0.0287  val 0.0327  eer  2.69%  auc 0.9951  frr@fa  3.82%  (94.5 fa/h)  141.1s+8.3s  *
+  epoch   7  train 0.0305  val 0.0390  eer  3.47%  auc 0.9936  frr@fa  6.21%  (88.2 fa/h)  142.0s+8.2s
+  epoch   8  train 0.0264  val 0.0256  eer  2.45%  auc 0.9950  frr@fa  3.77%  (65.1 fa/h)  141.3s+8.9s  *
+  epoch   9  train 0.0263  val 0.0261  eer  2.55%  auc 0.9955  frr@fa  3.80%  (84.0 fa/h)  142.4s+8.3s
+  epoch  10  train 0.0247  val 0.0259  eer  2.51%  auc 0.9954  frr@fa  3.81%  (77.7 fa/h)  142.4s+8.3s
+  epoch  11  train 0.0247  val 0.0265  eer  2.51%  auc 0.9957  frr@fa  3.80%  (79.8 fa/h)  142.4s+8.3s
+  epoch  12  train 0.0225  val 0.0299  eer  2.97%  auc 0.9937  frr@fa  6.16%  (75.6 fa/h)  143.1s+8.4s
+  epoch  13  train 0.0221  val 0.0258  eer  2.48%  auc 0.9956  frr@fa  3.79%  (79.8 fa/h)  142.5s+8.3s
+  epoch  14  train 0.0201  val 0.0283  eer  2.57%  auc 0.9951  frr@fa  3.83%  (84.0 fa/h)  142.7s+8.3s
+  epoch  15  train 0.0188  val 0.0266  eer  2.43%  auc 0.9947  frr@fa  3.79%  (73.5 fa/h)  142.7s+8.4s
+  epoch  16  train 0.0180  val 0.0268  eer  2.44%  auc 0.9948  frr@fa  3.79%  (67.2 fa/h)  142.4s+8.7s
+  early stop: no improvement in frr_at_fa for 8 epochs
+  best frr_at_fa 0.0377 at epoch 8
+  checkpoint runs/bigru_bridged/best.pt
+
+  timing on mps: Apple Silicon, arm64
+    total          40m 19.2s over 16 epochs
+    train          38m 02.8s (2m 22.7s per epoch, 4.7 clips/s, 5,818 frames/s)
+    validation     2m 16.3s (8.5s per epoch, 17.4 clips/s, 20,130 frames/s)
+    other          0.1s (setup, feature caching, checkpoint writes)
+    timing written to runs/bigru_bridged/timing.json
