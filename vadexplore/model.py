@@ -1,31 +1,12 @@
-"""Frame-level VAD model: shared frontend, swappable temporal core, shared head.
+"""Frame-level VAD: shared frontend, swappable temporal core, shared head.
 
-The point of the split is that a run differs from another run in exactly one
-place. The convolutional frontend and the per-frame head are identical objects
-for both cores, so any accuracy gap between `bigru` and `causal_attn` is
-attributable to the temporal block and nothing else.
-
-This model is not autoregressive: the output at frame t is never fed back as
-input. That has a consequence worth stating early, because it decides how the
-bounded-past attention is used. Once a past window is imposed, a batch forward
-pass with the windowed causal mask computes exactly what a frame-by-frame loop
-would compute, so evaluation runs through the ordinary masked forward and the
-streaming loop in `StreamingVADSession` is a verification and measurement tool,
-not a required path. The load-bearing part of the window is that it applies
-during training, so the model learns on the same amount of history it will have
-at deployment.
-
-Input is the collate output from `vadexplore.data`: features (B, T, n_mels),
-a boolean mask (B, T) that is True on real frames, and lengths (B,). Output is
-per-frame speech logits (B, T), with no sigmoid applied, so the caller pairs it
-with `binary_cross_entropy_with_logits`.
-
-torch only.
+Input features (B, T, n_mels) with a mask; output logits (B, T), no sigmoid.
 """
 
 from __future__ import annotations
 
 import math
+import textwrap
 
 import torch
 import torch.nn as nn
@@ -39,14 +20,8 @@ TEMPORAL_CORES = ("bigru", "causal_attn")
 class MaskedBatchNorm2d(nn.Module):
     """BatchNorm2d whose statistics ignore padded frames.
 
-    Plain BatchNorm would fold the padding zeros into the batch mean and
-    variance, so a real frame's output would depend on how much padding
-    happened to sit beside it in the batch. That is precisely the thing the
-    masking is supposed to prevent, and it is invisible at eval time because
-    running statistics are frozen, which makes it an easy bug to ship.
-
-    Statistics still depend on the other clips in the batch. That is ordinary
-    BatchNorm behavior, not a padding leak.
+    Plain BatchNorm folds padding zeros into the batch statistics, and it is
+    invisible at eval time because the running statistics are frozen.
     """
 
     def __init__(self, num_features: int, eps: float = 1e-5, momentum: float = 0.1):
@@ -80,18 +55,8 @@ class MaskedBatchNorm2d(nn.Module):
 class ConvFrontend(nn.Module):
     """Conv blocks over the time-frequency map, time resolution preserved.
 
-    Every convolution is stride 1 in time and pooling only ever touches the mel
-    axis, so the output has exactly as many frames as the input. Padded frames
-    are zeroed on the way in and on the way out, which together with the
-    masked normalization keeps padding out of every real frame's receptive
-    field.
-
-    With `causal_frontend` the time padding goes entirely on the left, so a
-    frame's features depend only on itself and earlier frames. This is what
-    makes the causal cores causal end to end: with symmetric padding a strictly
-    causal attention stack would still read `len(conv_channels)` frames of
-    future through the convolutions. It costs the offline BiGRU almost nothing,
-    since the recurrence supplies future context anyway.
+    With causal_frontend the time padding is left-only, without which a strictly
+    causal attention stack still reads len(conv_channels) frames of future.
     """
 
     def __init__(self, config: ModelConfig = DEFAULT_MODEL_CONFIG):
@@ -146,9 +111,8 @@ class ConvFrontend(nn.Module):
 class BiGRUCore(nn.Module):
     """Recurrent core. Bidirectional by default, unidirectional when causal.
 
-    Sequences are packed, so the recurrence literally never steps over a padded
-    frame and the backward direction starts at each clip's true final frame
-    rather than at the end of the batch.
+    Sequences are packed, so the backward pass starts at each clip's real final
+    frame rather than at the end of the batch.
     """
 
     def __init__(self, config: ModelConfig = DEFAULT_MODEL_CONFIG):
@@ -190,11 +154,7 @@ class SinusoidalPositionalEncoding(nn.Module):
         self.register_buffer("inverse_frequency", inverse)
 
     def at(self, index: int, device, dtype) -> torch.Tensor:
-        """Encoding for one absolute frame index, shape (d_model,).
-
-        Streaming needs the same vector the batch path would have placed at
-        this position, so both call into the same formula.
-        """
+        """Encoding for one absolute frame index, shape (d_model,)."""
         angles = torch.tensor([float(index)], device=device) * self.inverse_frequency.to(device)
         encoding = torch.zeros(self.d_model, device=device, dtype=dtype)
         encoding[0::2] = torch.sin(angles).to(dtype)
@@ -216,21 +176,10 @@ def causal_attention_mask(
     device,
     past_window: int | None = None,
 ) -> torch.Tensor:
-    """True where attention is forbidden. Query i may read keys in
-    [i - past_window, i + lookahead].
+    """True where attention is forbidden.
 
-    `lookahead == 0` is strictly causal. A positive value admits a bounded
-    window of future frames per layer, which is the accuracy against latency
-    knob.
-
-    `past_window` adds the lower bound. None leaves the past unbounded, which
-    is the original behavior and is fine for batch evaluation over finite
-    clips, but it cannot stream indefinitely at constant memory because the
-    key and value cache grows with the stream.
-
-    Both budgets compose over depth. See `VADModel.lookahead_frames` and
-    `VADModel.effective_past_window_frames` for the end-to-end figures, which
-    are these values times the number of attention layers.
+    Query i may read keys in [i - past_window, i + lookahead]; past_window=None is
+    unbounded. Both budgets compose over depth, so quote the effective figures.
     """
     index = torch.arange(n_frames, device=device)
     delta = index[None, :] - index[:, None]  # key index minus query index
@@ -243,22 +192,9 @@ def causal_attention_mask(
 class CausalAttentionCore(nn.Module):
     """Masked self-attention stack, streaming-capable by construction.
 
-    Each layer combines two masks. The causal mask stops a frame seeing further
-    ahead than its lookahead budget and, when `past_window_frames` is set,
-    further back than its past budget. The key padding mask stops any frame
-    attending to padded positions. Both are needed: the causal mask alone would
-    still let a late real frame read padding, and the padding mask alone would
-    leak the future.
-
-    `past_window_frames` is applied here, in the single forward path that both
-    training and evaluation use. That is the point of it: a model trained with
-    every frame attending to the whole clip has learned to rely on a history
-    length it will not have behind a deployment window, and its accuracy drops
-    when the window is imposed later. Train and deploy must use the same value.
-
-    A bounded past also makes `StreamingVADSession` possible, but that is a
-    secondary benefit. Since the model is not autoregressive, this masked
-    forward already equals the frame-by-frame result.
+    Causal mask and key padding mask are both needed: the first alone lets a late
+    real frame read padding, the second alone leaks the future. past_window_frames
+    applies here, in the forward path training and evaluation share.
     """
 
     def __init__(self, config: ModelConfig = DEFAULT_MODEL_CONFIG):
@@ -328,33 +264,20 @@ class FrameHead(nn.Module):
         return self.linear(self.norm(x)).squeeze(-1)
 
 
-def build_core(config: ModelConfig) -> nn.Module:
-    if config.temporal == "bigru":
-        return BiGRUCore(config)
-    if config.temporal == "causal_attn":
-        return CausalAttentionCore(config)
-    raise ValueError(f"temporal must be one of {TEMPORAL_CORES}, got {config.temporal!r}")
-
-
 class VADModel(nn.Module):
-    """Frame-level VAD: shared frontend, selected temporal core, shared head."""
-
     def __init__(self, config: ModelConfig = DEFAULT_MODEL_CONFIG):
         super().__init__()
         if config.temporal not in TEMPORAL_CORES:
             raise ValueError(f"temporal must be one of {TEMPORAL_CORES}, got {config.temporal!r}")
         self.config = config
         self.frontend = ConvFrontend(config)
-        self.core = build_core(config)
+        self.core = (BiGRUCore(config) if config.temporal == "bigru"
+                     else CausalAttentionCore(config))
         self.head = FrameHead(self.core.out_dim)
 
     @property
     def lookahead_frames(self) -> int:
-        """Frames of future a real frame's output can depend on.
-
-        The frontend contributes `len(conv_channels)` frames unless it is
-        causal, and a bidirectional core contributes an unbounded amount.
-        """
+        """Frames of future a real frame's output can depend on. -1 is unbounded."""
         frontend = 0 if self.config.causal_frontend else len(self.config.conv_channels)
         if self.config.temporal == "bigru":
             return frontend if self.config.causal else -1  # -1 means unbounded
@@ -368,16 +291,7 @@ class VADModel(nn.Module):
     def effective_past_window_frames(self) -> int | None:
         """End-to-end past context in frames, or None when unbounded.
 
-        Composes over depth exactly as the lookahead does. Layer 2 reads layer 1
-        outputs back to t - W, and each of those already read inputs back to
-        t - 2W, so the true context is the per-layer window times the number of
-        attention layers. Quote this figure, not the per-layer one, when
-        stating how much history the model uses or how much memory a stream
-        needs.
-
-        None for the BiGRU core: a recurrence carries unbounded history by
-        construction, and `past_window_frames` is an attention-only setting
-        that it ignores.
+        Per-layer window times depth. Quote this, not the per-layer number.
         """
         if self.config.temporal != "causal_attn":
             return None
@@ -421,11 +335,7 @@ class VADModel(nn.Module):
         return logits * mask.to(logits.dtype)
 
     def forward_batch(self, batch: dict) -> torch.Tensor:
-        """Convenience wrapper over the collate output."""
         return self(batch["features"], batch["mask"], batch["lengths"])
-
-
-# --- reporting ------------------------------------------------------------
 
 
 def count_parameters(module: nn.Module) -> int:
@@ -452,8 +362,7 @@ def masked_bce_loss(
 ) -> torch.Tensor:
     """Binary cross entropy over real frames only.
 
-    Padded positions carry the ignore value rather than a class, so they are
-    dropped before the loss instead of being weighted to zero afterwards.
+    Padded positions are dropped before the loss, not weighted to zero after.
     """
     valid = mask.reshape(-1)
     flat_logits = logits.reshape(-1)[valid]
@@ -462,15 +371,11 @@ def masked_bce_loss(
         flat_logits, flat_labels, pos_weight=pos_weight)
 
 
-# --- streaming inference --------------------------------------------------
-
-
 def _project_qkv(attention: nn.MultiheadAttention, x: torch.Tensor):
     """Split one frame through a MultiheadAttention's packed input projection.
 
-    Returns q, k, v each shaped (n_heads, head_dim). Reimplemented here because
-    `nn.MultiheadAttention` has no incremental interface; the weights are the
-    module's own, so the arithmetic stays identical to the batch path.
+    Returns q, k, v each (n_heads, head_dim). nn.MultiheadAttention has no
+    incremental interface, so the arithmetic is repeated with its own weights.
     """
     embed = attention.embed_dim
     heads = attention.num_heads
@@ -482,7 +387,9 @@ def _project_qkv(attention: nn.MultiheadAttention, x: torch.Tensor):
 
 
 def _attend(attention: nn.MultiheadAttention, q, keys, values) -> torch.Tensor:
-    """Single-query attention over a cache. q is (H, D); keys/values are (H, N, D)."""
+    """Single-query attention over a cache. q is (H, D); keys/values are (H, N,
+    D).
+    """
     head_dim = q.shape[-1]
     scores = (keys * q[:, None, :]).sum(-1) / (head_dim ** 0.5)  # (H, N)
     weights = torch.softmax(scores, dim=-1)
@@ -493,47 +400,18 @@ def _attend(attention: nn.MultiheadAttention, q, keys, values) -> torch.Tensor:
 class StreamingVADSession:
     """Frame-by-frame inference with a fixed-size key and value cache.
 
-    Not required to produce streaming-faithful metrics. Because the model is
-    not autoregressive, the masked batch forward with the same
-    `past_window_frames` and `lookahead_frames` computes numerically identical
-    per-frame logits, and that is what every reported evaluation number uses.
-    This class exists to prove that equivalence and to measure real per-frame
-    latency and constant memory, not to serve them.
-
-    Only the `causal_attn` core streams. The BiGRU core is bidirectional in its
-    default form and, even when made unidirectional, carries unbounded state,
-    so a windowed cache means nothing for it.
-
-    Memory. Per attention layer the cache holds at most
-    `past_window_frames + lookahead_frames + 1` entries, each one key and one
-    value of `d_model` floats, so the whole cache is
-
-        (past_window + lookahead + 1) * attn_layers * n_heads * head_dim * 2
-
-    floats, plus a frontend buffer of `frontend_context_frames + 1` input
-    frames. All of that is independent of how long the stream runs. With
-    `past_window_frames=None` the cache grows without bound, which is exactly
-    the failure the window exists to prevent; the session still runs so the
-    two can be compared, but it is not deployable.
-
-    Latency. A frame is emitted once its lookahead budget has been filled at
-    every layer, so the emission delay is `lookahead_frames * attn_layers`
-    frames. At the end of a stream, `finish()` releases the tail frames using
-    whatever future actually exists, which is what the batch path does too
-    since its padding mask blocks keys past the final frame.
+    Not required for evaluation: the model is not autoregressive, so the masked
+    batch forward gives identical logits. causal_attn only. The cache is
+    (past_window + lookahead + 1) * attn_layers * n_heads * head_dim * 2 floats,
+    constant in stream length; emission delay is lookahead_frames * attn_layers.
     """
 
     def __init__(self, model: "VADModel", device=None):
         if model.config.temporal != "causal_attn":
-            raise ValueError(
-                "streaming requires the causal_attn core; "
-                f"got temporal={model.config.temporal!r}. The BiGRU core is "
-                "bidirectional by default and keeps unbounded recurrent state, "
-                "so past_window_frames does not apply to it."
-            )
+            raise ValueError("streaming requires the causal_attn core, got "
+                             f"temporal={model.config.temporal!r}")
         if model.training:
-            raise ValueError("call model.eval() before streaming; dropout and batch "
-                             "statistics must be frozen for streaming to match batching")
+            raise ValueError("call model.eval() before streaming")
 
         self.model = model
         self.core = model.core
@@ -556,8 +434,6 @@ class StreamingVADSession:
         self._next_emit = 0
         self._finished = False
 
-    # --- introspection ---
-
     @property
     def cached_entries(self) -> int:
         """Live key and value pairs across all layers, for the memory claim."""
@@ -567,13 +443,10 @@ class StreamingVADSession:
     def emission_delay_frames(self) -> int:
         return self.lookahead * self.n_layers
 
-    # --- driving the stream ---
-
     def push(self, frame: torch.Tensor) -> list[tuple[int, float]]:
         """Feed one frame of shape (n_mels,). Returns whatever became emittable.
 
-        Not needed for streaming-faithful evaluation: the windowed batch
-        forward is numerically identical for this non-autoregressive model.
+        Not needed for evaluation; the windowed batch forward is identical.
         """
         if self._finished:
             raise RuntimeError("session already finished")
@@ -598,12 +471,9 @@ class StreamingVADSession:
         return self._advance()
 
     def run(self, features: torch.Tensor) -> torch.Tensor:
-        """Stream a whole (n_frames, n_mels) clip and return logits (n_frames,).
+        """Stream a whole (n_frames, n_mels) clip, return logits (n_frames,).
 
-        Not needed for streaming-faithful evaluation: for this
-        non-autoregressive model the windowed batch forward returns the same
-        logits, so use it instead and keep this for equivalence checks and
-        latency measurement.
+        Not needed for evaluation; keep it for equivalence checks and latency.
         """
         emitted: list[tuple[int, float]] = []
         for i in range(features.shape[0]):
@@ -618,17 +488,11 @@ class StreamingVADSession:
                                f"{features.shape[0]} frames")
         return logits
 
-    # --- internals ---
-
     def _frontend_frame(self, index: int) -> torch.Tensor:
-        """Run the shared frontend over the rolling buffer, keep the last frame.
+        """Run the frontend over the rolling buffer, keep the last frame.
 
-        The buffer carries `frontend_context` real past frames so the causal
-        convolutions see the same history the batch path would give them. At
-        the very start of a stream the missing history is marked invalid rather
-        than zero-filled, because the frontend re-zeros masked positions between
-        blocks and a valid-but-zero frame would pick up the conv and norm biases
-        instead of staying at zero.
+        Missing history at the start is marked invalid rather than zero-filled: the
+        frontend re-zeros masked positions, so a valid-but-zero frame picks up biases.
         """
         needed = self.frontend_context + 1
         pad = needed - len(self._buffer)
@@ -669,7 +533,6 @@ class StreamingVADSession:
                     if not self._finished and self._available[layer] < query + self.lookahead:
                         break
 
-                    # project any newly available frames into the cache once
                     for index in self._key_range(layer, query):
                         if index not in self._cache[layer]:
                             normed = attn_norm(self._features[layer][index])
@@ -770,7 +633,6 @@ def _methodology_note(config: ModelConfig) -> list[str]:
 
 def print_streaming_profile(config: ModelConfig = DEFAULT_MODEL_CONFIG,
                             hop_ms: float = 10.0) -> dict:
-    """Human-readable form of `streaming_profile`, for the deployment section."""
     profile = streaming_profile(config, hop_ms)
     print(f"streaming profile: {profile['temporal']}")
     if not profile["streamable"]:
@@ -778,7 +640,7 @@ def print_streaming_profile(config: ModelConfig = DEFAULT_MODEL_CONFIG,
         print("  past_window_frames and lookahead_frames are attention-only and ignored here")
         print("  methodology")
         for paragraph in profile["methodology"]:
-            for line in _wrap(paragraph, 74):
+            for line in textwrap.wrap(paragraph, 74, break_on_hyphens=False):
                 print(f"    {line}")
         return profile
 
@@ -797,19 +659,7 @@ def print_streaming_profile(config: ModelConfig = DEFAULT_MODEL_CONFIG,
               f"({profile['kv_cache_kib']:.1f} KiB at fp32), constant in stream length")
     print("  methodology")
     for paragraph in profile["methodology"]:
-        for line in _wrap(paragraph, 74):
+        for line in textwrap.wrap(paragraph, 74, break_on_hyphens=False):
             print(f"    {line}")
     return profile
 
-
-def _wrap(text: str, width: int) -> list[str]:
-    lines, current = [], ""
-    for word in text.split():
-        if current and len(current) + 1 + len(word) > width:
-            lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}".strip()
-    if current:
-        lines.append(current)
-    return lines

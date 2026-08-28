@@ -1,0 +1,75 @@
+Using cache found in /Users/mohammedhafsati/.cache/torch/hub/snakers4_silero-vad_master
+cross-checking 957 clips against Silero VAD (threshold 0.5, collar 2 frames)
+  200/957
+  400/957
+  600/957
+  800/957
+
+writing 14 disagreement triptychs to explore_out/disagreements
+  0.747  1183-124566-0005     worst agreement
+  0.748  1898-145702-0017     worst agreement
+  0.751  1235-135884-0026     worst agreement
+  0.782  1624-142933-0046     worst agreement
+  0.789  125-121342-0024      worst agreement
+  0.790  1624-142933-0007     worst agreement
+  0.791  1578-140049-0007     worst agreement
+  0.804  1447-130551-0008     worst agreement
+  0.811  150-132655-0032      worst agreement
+  0.817  1447-130550-0020     worst agreement
+  0.823  1594-135914-0032     worst agreement
+  0.827  1334-135589-0030     worst agreement
+  0.907  1447-130552-0010     clip of interest: suspected low-volume speech dropped by the aligner
+  0.947  1334-135589-0065     clip of interest: noisy clip
+
+silero agreement: 957 clips, threshold 0.5, collar 2 frames
+                 IoU      F1   kappa     acc    IoU+collar  F1+collar  kappa+col
+  literal      0.936   0.967   0.811   0.946         0.960      0.980      0.880
+  bridged      0.945   0.972   0.830   0.954         0.957      0.978      0.859
+
+  boundary bias (positive means Silero is late), median over clips
+    vs literal  onsets  +45.0 ms   offsets  +30.0 ms   combined  +40.0 ms
+    vs bridged  onsets  +50.0 ms   offsets  +30.0 ms   combined  +45.0 ms
+    Silero's own resolution is +/- 16 ms, so bias inside that band is not meaningful
+
+  clips below IoU 0.7
+    vs literal     0
+    vs bridged     0
+    below against BOTH conventions: 0 (these are the real candidates for label review)
+
+  disagreement kind (collar 2 frames)
+    vs literal
+      boundary-only    6723 runs,   11088 frames (16.7%)  expected method difference
+      region           7351 runs,   55329 frames (83.3%)  candidate label errors
+        of the region frames, 23735 are labeled speech Silero calls silence,
+        31594 are labeled silence Silero calls speech
+    vs bridged
+      boundary-only    1350 runs,    2003 frames ( 3.5%)  expected method difference
+      region           6672 runs,   55723 frames (96.5%)  candidate label errors
+        of the region frames, 29726 are labeled speech Silero calls silence,
+        25997 are labeled silence Silero calls speech
+
+  collar sensitivity: share of disagreed frames that is boundary-only
+    collar           0 ms      20 ms      40 ms      60 ms      80 ms
+    vs literal      0.0%     16.7%     32.6%     50.7%     59.7%
+    vs bridged      0.0%      3.5%     14.7%     30.7%     38.7%
+    Silero lags the reference by about +40 ms, so a collar narrower than
+    that cannot absorb its causal latency and reports shifted boundaries as regions.
+
+generated files
+  explore_out/disagreements/1183-124566-0005.png  (125,462 bytes)
+  explore_out/disagreements/1235-135884-0026.png  (235,096 bytes)
+  explore_out/disagreements/125-121342-0024.png  (140,258 bytes)
+  explore_out/disagreements/1334-135589-0030.png  (171,543 bytes)
+  explore_out/disagreements/1334-135589-0065.png  (249,574 bytes)
+  explore_out/disagreements/1447-130550-0020.png  (250,560 bytes)
+  explore_out/disagreements/1447-130551-0008.png  (275,401 bytes)
+  explore_out/disagreements/1447-130552-0010.png  (277,286 bytes)
+  explore_out/disagreements/150-132655-0032.png  (152,282 bytes)
+  explore_out/disagreements/1578-140049-0007.png  (161,416 bytes)
+  explore_out/disagreements/1594-135914-0032.png  (146,533 bytes)
+  explore_out/disagreements/1624-142933-0007.png  (255,414 bytes)
+  explore_out/disagreements/1624-142933-0046.png  (148,873 bytes)
+  explore_out/disagreements/1898-145702-0017.png  (144,359 bytes)
+  explore_out/figures/silero_agreement.png  (64,514 bytes)
+  explore_out/figures/silero_boundary_bias.png  (63,356 bytes)
+  explore_out/silero_agreement.json  (5,037,444 bytes)

@@ -1,17 +1,6 @@
-"""Score the trained model against reference VADs on the identical test split.
-
-Every system sees the same audio with the same 80 Hz high-pass, is scored on
-the same frames with the same label convention, and follows the same
-operating-point rule: thresholds come from validation and are applied unchanged
-to test.
-
-WebRTC emits a binary decision rather than a score, so it has no curve. Its
-aggressiveness mode is its operating point, and the mode that validation would
-have chosen is reported alongside all four so the choice is not made on test.
+"""Score the trained model against Silero and WebRTC on the same test split.
 
     python scripts/eval_baselines.py --run runs/<name>
-
-torch, numpy, matplotlib, webrtcvad, and the cached Silero model.
 """
 
 from __future__ import annotations
@@ -26,7 +15,6 @@ import matplotlib
 matplotlib.use("Agg")
 
 import numpy as np
-import torch
 import webrtcvad
 
 from vadexplore.config import DataConfig
@@ -60,26 +48,12 @@ def _resolve(path) -> Path:
     return Path(os.path.expanduser(str(path)))
 
 
-def clip_labels(clip, convention: str, config: DataConfig) -> np.ndarray:
-    return make_labels(clip, fps=config.fps,
-                       bridge_gap_s=config.bridge_gap_s)[convention].astype(bool)
-
-
-def conditioned_audio(clip, config: DataConfig) -> np.ndarray:
-    """The same preprocessed signal every system is scored on."""
-    audio = read_audio(clip, target_sr=config.sample_rate)
-    return highpass(audio, config.sample_rate, config.highpass_hz, config.highpass_order)
-
-
 def webrtc_frames(audio: np.ndarray, n_frames: int, mode: int,
                   sr: int = DEFAULT_SR) -> np.ndarray:
-    """WebRTC decisions on the 100 fps grid, one decision per label frame.
+    """WebRTC decisions on the 100 fps grid, one per label frame.
 
-    WebRTC accepts 10, 20, or 30 ms frames. At 16 kHz the 10 ms option is
-    exactly 160 samples, which is the project hop, so each decision lines up
-    with one label frame and no resampling of the decision sequence is needed.
-    The signal is padded or trimmed to the label length first, so the output
-    length is exact by construction.
+    At 16 kHz WebRTC's 10 ms frame is 160 samples, which is the project hop, so
+    nothing has to be resampled.
     """
     hop = sr * WEBRTC_FRAME_MS // 1000
     needed = n_frames * hop
@@ -102,8 +76,11 @@ def gather(stems, directory, convention, config, system: str, mode: int | None =
     scores, labels, kept = [], [], []
     for stem in stems:
         clip = load_clip(directory / stem)
-        reference = clip_labels(clip, convention, config)
-        audio = conditioned_audio(clip, config)
+        reference = make_labels(clip, fps=config.fps,
+                                bridge_gap_s=config.bridge_gap_s)[convention].astype(bool)
+        # every system is scored on this same conditioned signal
+        audio = highpass(read_audio(clip, target_sr=config.sample_rate),
+                         config.sample_rate, config.highpass_hz, config.highpass_order)
         n_frames = len(reference)
 
         if system == "webrtc":
@@ -166,8 +143,6 @@ def main(argv=None) -> int:
     from vadexplore.data import VADDataset
     systems: dict[str, dict] = {}
 
-    # --- the trained model ---
-    print("  model ...", flush=True)
     model_val = collect_predictions(
         model, VADDataset("val", convention, split_data, config, stats=stats), device)
     model_test = collect_predictions(
@@ -175,15 +150,12 @@ def main(argv=None) -> int:
     systems[f"model ({payload.get('run_name')})"] = {
         "kind": "scored", "val": model_val, "test": model_test}
 
-    # --- Silero ---
-    print("  silero ...", flush=True)
     systems["silero"] = {
         "kind": "scored",
         "val": gather(val_stems, directory, convention, config, "silero"),
         "test": gather(test_stems, directory, convention, config, "silero"),
     }
 
-    # --- WebRTC, one entry per aggressiveness mode ---
     for mode in WEBRTC_MODES:
         print(f"  webrtc mode {mode} ...", flush=True)
         systems[f"webrtc mode {mode}"] = {
@@ -192,7 +164,6 @@ def main(argv=None) -> int:
             "test": gather(test_stems, directory, convention, config, "webrtc", mode),
         }
 
-    # --- score everything the same way ---
     report = {
         "split": args.split,
         "convention": convention,
@@ -267,7 +238,6 @@ def main(argv=None) -> int:
 
     (out_dir / f"eval_{args.split}.json").write_text(json.dumps(report, indent=2))
 
-    # --- combined DET ---
     palette = {"model": "#2b6cb0", "silero": "#2f855a"}
     curves = {}
     for name, record in report["systems"].items():
@@ -287,11 +257,9 @@ def main(argv=None) -> int:
     plot_det(curves, markers, figure_path,
              f"Model against reference VADs, {args.split} split ({convention} labels)")
 
-    # --- table ---
-    print(f"\n{'=' * 92}")
+    print()
     print(f"COMPARISON on {args.split}  ({convention} labels, collar "
           f"{args.collar_s*1000:.0f} ms)")
-    print("=" * 92)
     collars = args.collar_sweep
     header_collars = "".join(f"{'F1@' + str(int(c*1000)) + 'ms':>9}" for c in collars)
     print(f"  {'system':<26} {'EER%':>7} {'ROC-AUC':>8} {'PR-AUC':>8} "
@@ -309,12 +277,6 @@ def main(argv=None) -> int:
         print(f"  {name:<26} {eer:>7} {auc:>8} {prauc:>8} "
               f"{frame['frr']*100:7.2f} {frame['fa_per_hour']:8.1f}{cells}")
 
-    print(f"\n  FRR and fa/h are at each system's operating point. For the scored systems")
-    print(f"  that is the threshold validation chose for the "
-          f"{args.fa_targets[-1]:g}/h budget; for WebRTC it is the")
-    print(f"  aggressiveness mode itself, which is not tunable, so those two columns are")
-    print(f"  not comparable across the two kinds. EER and the areas need no threshold and")
-    print(f"  are not defined for a binary system.")
     print(f"\n  {'system':<26} {'FRR%':>7} {'fa/h':>8}{header_collars}   at the neutral 0.5 threshold")
     for name, record in report["systems"].items():
         default = record["at_default_threshold"]
@@ -323,10 +285,6 @@ def main(argv=None) -> int:
         print(f"  {name:<26} {default['test_frame']['frr']*100:7.2f} "
               f"{default['test_frame']['fa_per_hour']:8.1f}{cells}")
 
-    print(f"\n  Segment F1 is shown at several collars because a fixed 50 ms collar")
-    print(f"  penalizes any system with an inherent boundary lag. Silero is causal and")
-    print(f"  runs about 40 to 50 ms late, so its F1 climbs sharply as the collar widens;")
-    print(f"  the model was trained on these exact boundaries and does not pay that cost.")
     if webrtc:
         print(f"  webrtc mode chosen on val: {report['webrtc_mode_selected_on_val']}")
     print(f"\n  results {out_dir / f'eval_{args.split}.json'}")

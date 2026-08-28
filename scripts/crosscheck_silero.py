@@ -1,12 +1,6 @@
-"""Cross-check the provided VAD labels against Silero VAD over the corpus.
+"""Cross-check the labels against Silero VAD over the whole corpus.
 
-Writes explore_out/silero_agreement.json, agreement figures into
-explore_out/figures/, and per-clip triptychs for the worst disagreements into
-explore_out/disagreements/.
-
-The first run needs network access so torch.hub can cache the model. Every
-later run is offline. If the model cannot be loaded the script stops with
-instructions rather than inventing outputs.
+Needs network access on the first run so torch.hub can cache the model.
 
     python scripts/crosscheck_silero.py [dataset_dir] [--out DIR] [--threshold P]
                                         [--tol-frames N] [--flag-iou X] [--worst N]
@@ -75,9 +69,6 @@ def _median(values):
     return float(np.median(clean)) if clean else None
 
 
-# --- figures --------------------------------------------------------------
-
-
 def fig_agreement(rows, flag_iou, out_dir, generated):
     fig, axes = plt.subplots(1, 2, figsize=(14, 4.6))
     bins = np.linspace(0, 1, 51)
@@ -140,12 +131,9 @@ def fig_boundary_bias(rows, out_dir, generated):
     _style(ax, "Boundary bias, onsets and offsets combined",
            "median per-clip bias (ms)", "clips")
 
-    fig.suptitle("Where Silero places boundaries relative to the provided labels", fontsize=12)
+    fig.suptitle("Silero boundary placement", fontsize=12)
     fig.tight_layout()
     _save(fig, out_dir / "silero_boundary_bias.png", generated)
-
-
-# --- main -----------------------------------------------------------------
 
 
 def main() -> int:
@@ -211,7 +199,6 @@ def main() -> int:
         if i % 200 == 0:
             print(f"  {i}/{len(clips)}")
 
-    # --- summary ---
     summary = {"threshold": args.threshold, "tol_frames": args.tol_frames,
                "flag_iou": args.flag_iou, "n_clips": len(rows)}
     for key in ("literal", "bridged"):
@@ -258,12 +245,10 @@ def main() -> int:
     summary["n_below_flag_iou_both_conventions"] = int(
         sum(1 for r in rows if r["best_iou"] < args.flag_iou))
 
-    # --- figures ---
     generated = []
     fig_agreement(rows, args.flag_iou, fig_dir, generated)
     fig_boundary_bias(rows, fig_dir, generated)
 
-    # --- disagreement triptychs ---
     worst = sorted(rows, key=lambda r: r["best_iou"])[:args.worst]
     selected = [(r, "worst agreement") for r in worst]
     chosen_stems = {r["stem"] for r in worst}
@@ -298,7 +283,6 @@ def main() -> int:
         _save(fig, dis_dir / f"{clip.stem}.png", generated)
         print(f"  {row['best_iou']:.3f}  {clip.stem:20s} {reason}")
 
-    # --- json ---
     payload = {
         "dataset_dir": os.path.expanduser(args.directory),
         "model": {
@@ -337,8 +321,8 @@ def main() -> int:
 
 
 def _print_summary(summary, args):
-    print(f"\n{'=' * 78}\nSILERO AGREEMENT  ({summary['n_clips']} clips, "
-          f"threshold {args.threshold}, collar {args.tol_frames} frames)\n{'=' * 78}")
+    print(f"\nsilero agreement: {summary['n_clips']} clips, "
+          f"threshold {args.threshold}, collar {args.tol_frames} frames")
     print(f"  {'':<10} {'IoU':>7} {'F1':>7} {'kappa':>7} {'acc':>7}   "
           f"{'IoU+collar':>11} {'F1+collar':>10} {'kappa+col':>10}")
     for key in ("literal", "bridged"):

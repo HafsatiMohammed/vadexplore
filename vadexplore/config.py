@@ -1,10 +1,4 @@
-"""Frozen configuration for the data layer.
-
-The frame grid is fixed project-wide and matches `vadexplore.labels`. The two
-fields that are genuinely experimental knobs are `highpass_hz`, where None
-disables filtering for the with-versus-without ablation, and `bridge_gap_s`,
-which is committed at the 100 ms elbow found in the gap analysis.
-"""
+"""Config dataclasses for the data layer and the model."""
 
 from __future__ import annotations
 
@@ -35,7 +29,7 @@ class DataConfig:
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Frontend and head are shared; `temporal` is the only thing that varies."""
+    """Frontend and head are shared; temporal is the only thing that varies."""
 
     n_mels: int = 40
     conv_channels: tuple = (32, 64, 64)

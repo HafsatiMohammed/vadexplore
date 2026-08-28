@@ -1,0 +1,24 @@
+post-processing sweep for attn_pw_1s (bridged labels)
+  threshold 0.8923, chosen on val for the 100/h budget and held fixed throughout
+  collar 50 ms, 148 val clips, 136 test clips
+
+  sweeping 175 settings on val ...
+  figure largest gain         19-198-0012          F1 0.000 -> 1.000
+  figure median case          1355-39947-0047      F1 0.400 -> 0.571
+  figure largest regression   1235-135887-0000     F1 1.000 -> 0.000
+
+POST-PROCESSING on test   (settings selected on val segment F1, threshold fixed at 0.8923)
+  setting                                    segF1    segP    segR   #hyp  frameF1    FRR%
+  raw threshold (baseline)                   0.216   0.168   0.302   1106    0.968    6.07
+  + smooth only (med90)                      0.294   0.258   0.341    814    0.969    5.83  (+0.078)
+  + min_speech only (minsp200)               0.245   0.205   0.302    906    0.964    6.72  (+0.028)
+  + hangover only (hang100)                  0.406   0.381   0.434    701    0.979    2.21  (+0.190)
+  full pipeline (hang100)                    0.406   0.381   0.434    701    0.979    2.21  (+0.190)
+
+  reference segments on test: 615
+  order applied: smooth posterior, threshold, min speech duration, hangover
+
+  results runs/postproc/results.json
+  figure  explore_out/figures/postproc_19-198-0012.png
+  figure  explore_out/figures/postproc_1355-39947-0047.png
+  figure  explore_out/figures/postproc_1235-135887-0000.png

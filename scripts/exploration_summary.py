@@ -1,16 +1,7 @@
-"""Assemble explore_out/DATA_REPORT.md from the saved exploration artifacts.
-
-Every number is read from the JSON written by the earlier scripts and every
-figure is embedded by relative path. Nothing is recomputed and nothing is
-hardcoded in the prose, so the report cannot drift away from the code that
-produced it. A missing key is a hard failure naming the key and the script
-that should have produced it.
+"""Assemble explore_out/DATA_REPORT.md from corpus_stats.json and
+silero_agreement.json. Nothing is recomputed; a missing key is a hard failure.
 
     python scripts/exploration_summary.py [--out DIR]
-
-Inputs, produced by:
-    explore_out/corpus_stats.json       scripts/corpus_report.py
-    explore_out/silero_agreement.json   scripts/crosscheck_silero.py
 """
 
 from __future__ import annotations
@@ -98,7 +89,6 @@ def build(out_dir: Path) -> tuple[str, Figures]:
     silero = Source(out_dir / "silero_agreement.json", SOURCES["silero_agreement.json"])
     fig = Figures(out_dir)
 
-    # --- pull everything up front so a missing key fails before any writing ---
     n_clips = corpus.get("corpus.n_clips")
     hours = corpus.get("corpus.total_hours")
     n_speakers = corpus.get("corpus.n_speakers")
@@ -162,7 +152,6 @@ def build(out_dir: Path) -> tuple[str, Figures]:
 
     worst = min(per_clip, key=lambda r: r["best_iou"])
 
-    # --- prose ---
     parts = []
 
     parts.append(f"""# Data report: voice activity detection corpus
@@ -175,7 +164,6 @@ Frame grid throughout: {grid['sample_rate']} Hz audio, {grid['hop_ms']} ms hop,
 {grid['win_ms']} ms analysis window, {grid['fps']} frames per second.
 """)
 
-    # 1. Dataset overview
     parts.append(f"""## 1. Dataset overview
 
 The corpus is {n_clips} single-speaker read-speech clips derived from
@@ -192,7 +180,6 @@ speaker-disjoint split to remain balanced.
 {fig.embed('figures/durations.png', 'Clip duration distribution over the whole corpus.')}
 {fig.embed('figures/speakers.png', 'Corpus composition: clips per speaker, minutes per speaker, and the proposed speaker-disjoint split.')}""")
 
-    # 2. Labels and bridging
     parts.append(f"""## 2. Labels and the bridging decision
 
 The speech segments are forced-alignment output, not human annotation. They are
@@ -231,7 +218,6 @@ sensitivity axis rather than a baked-in assumption.
 
 {fig.embed('figures/segments_and_gaps.png', 'Segment lengths, the full gap distribution, and the 10 ms bucket detail showing the elbow between the artifact cluster and the genuine-pause plateau.')}""")
 
-    # 3. Class balance
     parts.append(f"""## 3. Class balance
 
 The corpus is heavily imbalanced, and in the direction opposite to the usual
@@ -255,7 +241,6 @@ established. The detail belongs to the modeling section.
 
 {fig.embed('figures/class_balance.png', 'Per-clip speech fraction under both label conventions, with the corpus-level fractions marked.')}""")
 
-    # 4. Recording conditions
     parts.append(f"""## 4. Recording conditions
 
 Per-clip signal-to-noise ratio is estimated as the ratio of mean frame energy
@@ -302,7 +287,6 @@ noise on the speech, so gating first would have wrongly excluded
 {fig.embed('figures/rumble_highpass.png', 'The worst rumble clip before and after the 80 Hz high-pass, same labels on both.')}
 {fig.embed('figures/snr.png', 'Per-clip SNR before and after the high-pass, and the SNR gain plotted against the unfiltered value.')}""")
 
-    # 5. Position
     parts.append(f"""## 5. Label density against position
 
 Because clips are cut from longer recordings, it is worth checking whether
@@ -318,7 +302,6 @@ mild, but random cropping during training removes even that.
 
 {fig.embed('figures/position.png', 'Mean speech probability against normalized position within the clip.')}""")
 
-    # 6. Silero
     lit, bri = sil_sum["literal"], sil_sum["bridged"]
     interest_prose = []
     for stem, reason in interest.items():
@@ -385,7 +368,6 @@ clips are excluded from the corpus.
 {fig.embed(f"disagreements/{worst['stem']}.png", f"Lowest-agreement clip in the corpus, {worst['stem']} (best IoU {worst['best_iou']:.3f}), with the Silero probability overlaid on both label ribbons.")}
 {fig.embed(f"disagreements/{list(interest)[0]}.png", f"Clip of interest {list(interest)[0]}: {interest[list(interest)[0]]}.")}""")
 
-    # 7. Split
     total_clips = sum(v["n_clips"] for v in split.values())
     rows = "\n".join(
         f"| {name} | {v['n_speakers']} | {v['n_clips']} | {pct(v['clip_fraction'])} | {v['hours']:.2f} |"
@@ -410,7 +392,6 @@ to hold out, and any attempt to carve one would confound difficulty with speaker
 identity. Generating the difficulty keeps it parameterized, reproducible, and
 independent of who is speaking.""")
 
-    # 8. Closing
     parts.append(f"""## 8. Decisions carried into modeling
 
 Four choices are committed. An {hp['cutoff_hz']:.0f} Hz high-pass is applied as

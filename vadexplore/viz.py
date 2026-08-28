@@ -1,14 +1,4 @@
-"""Per-clip inspection figure for VAD.
-
-Everything here sits on the fixed project frame grid, so the waveform, the
-log-mel image, and every label ribbon share one time axis and one x-range. A
-feature at time t lands on the same x pixel in every panel, which is the only
-way an alignment bug is visible by eye.
-
-`logmel` is re-exported from `vadexplore.features`. It lives there rather than
-here so that training and evaluation can import the canonical feature function
-without pulling in matplotlib.
-"""
+"""Per-clip inspection figure: waveform, log-mel, and label ribbons on one axis."""
 
 from __future__ import annotations
 
@@ -20,10 +10,8 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 
 from vadexplore.features import DEFAULT_N_MELS, DEFAULT_SR, logmel
-from vadexplore.labels import DEFAULT_FPS, frame_times, make_labels
+from vadexplore.labels import frame_times, make_labels
 from vadexplore.loader import read_audio
-
-__all__ = ["logmel", "plot_clip"]
 
 # Plotting only. A long clip has far more samples than the figure has pixels,
 # so the waveform is drawn as a min/max envelope instead.
@@ -50,11 +38,9 @@ def _is_binary(values: np.ndarray) -> bool:
 
 
 def _draw_ribbon(ax, values: np.ndarray, fps: int, color: str, label: str) -> None:
-    """Filled band over frames where `values` is nonzero.
+    """Filled band over frames where values is nonzero.
 
-    Uses frame edges with step="post", so each frame is painted from its own
-    start to the next frame's start. That keeps the band aligned with the
-    spectrogram column above it frame for frame.
+    step="post" on frame edges keeps it aligned with the spectrogram column above.
     """
     edges = np.arange(len(values) + 1, dtype=np.float64) / fps
     mask = np.concatenate([np.asarray(values).astype(bool), [False]])
@@ -83,9 +69,7 @@ def _draw_prob(ax, values: np.ndarray, fps: int, color: str, label: str) -> None
 def _normalize_tracks(extra_tracks) -> list[tuple[str, np.ndarray, bool]]:
     """Resolve extra_tracks into (name, values, is_binary).
 
-    A bare array is auto-detected. A (values, kind) tuple with kind "binary" or
-    "prob" overrides that, for the case of a posterior that happens to be
-    saturated to 0 and 1 on a short clip.
+    A (values, kind) tuple overrides auto-detection, for a saturated posterior.
     """
     resolved = []
     for name, entry in (extra_tracks or {}).items():
@@ -116,20 +100,8 @@ def plot_clip(
 ):
     """Stacked waveform, log-mel, and label ribbons for one clip.
 
-    All panels share one x-axis in seconds and one x-range, so vertical
-    alignment is exact. The colorbar sits in its own gridspec column rather
-    than being stolen from the spectrogram axes, which would have made that
-    one panel narrower than the rest and broken the alignment.
-
-    `audio` overrides the samples read from disk, which is how a filtered or
-    augmented version of a clip gets plotted against the same labels.
-
-    `labels` defaults to `make_labels(clip)`. `extra_tracks` maps a name to a
-    frame-rate array, drawn as a ribbon when binary and as a line when it is a
-    probability. `max_seconds` crops the view for dense clips. Pass `ax` to
-    build the stack inside an existing subplot slot. `save` writes a PNG.
-
-    Returns (figure, {panel_name: axes}).
+    All panels share one x-axis in seconds. audio overrides the samples read from
+    disk. Returns (figure, {panel_name: axes}).
     """
     if labels is None:
         labels = make_labels(clip)
@@ -182,7 +154,6 @@ def plot_clip(
         first = first or panel
         axes[name] = panel
 
-    # waveform
     wave_ax = axes["wave"]
     if len(audio) > WAVE_MAX_POINTS * 2:
         lo, hi = _envelope(audio, WAVE_MAX_POINTS)

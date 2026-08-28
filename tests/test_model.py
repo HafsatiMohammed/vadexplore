@@ -15,7 +15,6 @@ from vadexplore.config import ModelConfig
 from vadexplore.model import (
     TEMPORAL_CORES,
     VADModel,
-    count_parameters,
     masked_bce_loss,
     parameter_report,
 )

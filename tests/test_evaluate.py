@@ -227,14 +227,6 @@ def test_segment_metrics_recovers_perfect_segments():
     assert result["matched"] == 2 and result["f1"] == pytest.approx(1.0)
 
 
-def test_postprocessing_hooks_are_off_by_default():
-    frames = np.array([1, 0, 1, 1, 1, 0, 0, 1], dtype=bool)
-    assert np.array_equal(E.postprocess_frames(frames), frames)
-    # and they do something when asked
-    filled = E.postprocess_frames(frames, min_silence_s=0.02)
-    assert filled.sum() > frames.sum()
-
-
 # --- 5. baseline frame alignment ------------------------------------------
 
 

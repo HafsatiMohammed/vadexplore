@@ -1,19 +1,4 @@
-"""Label geometry: segment cleanup, frame rasterization, and the inverse.
-
-The frame grid is fixed project-wide: 16 kHz audio, 10 ms hop, 25 ms analysis
-window, so 100 frames per second. Frame i covers [i/fps, (i+1)/fps).
-
-Note that rasterization uses the hop grid, not the 25 ms window. A frame's
-label is defined by the 10 ms of time it advances, so consecutive frames tile
-the clip exactly once. The 25 ms window matters for feature extraction, where
-neighbouring frames deliberately overlap, and it must not leak into label
-geometry or every boundary would be counted more than once.
-
-`normalize_segments` is the single canonical cleanup. Everything else here
-runs it first, so callers can pass raw loader segments safely.
-
-numpy only.
-"""
+"""Label geometry: segment cleanup, rasterization, and the inverse."""
 
 from __future__ import annotations
 
@@ -40,24 +25,10 @@ def normalize_segments(
     segments: list[tuple[float, float]],
     tol_s: float = DEFAULT_TOL_S,
 ) -> list[tuple[float, float]]:
-    """Clean forced-alignment artifacts out of a segment list.
+    """Clean aligner artifacts out of a segment list.
 
-    Drops zero-length segments, sorts by start, and merges runs whose gap is
-    smaller than `tol_s` into maximal non-overlapping intervals. That covers
-    the three things the aligner produces: segments touching at a shared
-    endpoint, zero-length segments, and float jitter around a shared boundary
-    (9.059999 against 9.06).
-
-    This removes artifacts only. Genuine gaps of `tol_s` or more survive
-    untouched, because bridging real silence is a separate decision with its
-    own parameter, not something to smuggle in here.
-
-    A gap of exactly `tol_s` survives. At the default that is one whole
-    frame of silence, which the frame grid can represent, so it is real
-    non-speech rather than something to smooth away.
-
-    Idempotent: every gap in the output is at least `tol_s`, so a second pass
-    is a no-op.
+    Merges anything closer than tol_s; a gap of exactly tol_s survives, and so
+    does anything larger. Idempotent.
     """
     positive = [(float(s), float(e)) for s, e in segments if float(e) - float(s) > 0]
     if not positive:
@@ -86,7 +57,7 @@ def n_frames_for(duration_s: float, fps: int = DEFAULT_FPS) -> int:
 
 
 def frame_times(n_frames: int, fps: int = DEFAULT_FPS) -> np.ndarray:
-    """Start time in seconds of each frame, for plotting and alignment."""
+    """Start time in seconds of each frame."""
     return np.arange(int(n_frames), dtype=np.float64) / float(fps)
 
 
@@ -97,11 +68,7 @@ def frame_overlap_s(
 ) -> np.ndarray:
     """Seconds of speech inside each frame interval.
 
-    Works segment by segment rather than frame by frame: a segment touches a
-    contiguous index range, so each one is a single slice update. Cost scales
-    with the covered frames, never with audio samples.
-
-    Expects normalized segments. Overlapping input would double count.
+    Expects normalized segments; overlapping input double counts.
     """
     n_frames = int(n_frames)
     overlap = np.zeros(n_frames, dtype=np.float64)
@@ -126,15 +93,10 @@ def rasterize(
     fps: int = DEFAULT_FPS,
     rule: str = "majority",
 ) -> np.ndarray:
-    """Turn speech segments into an int8 frame label array.
+    """Speech segments to an int8 frame label array.
 
-    Frame i covers [i/fps, (i+1)/fps). Under "majority" a frame is speech when
-    speech covers at least half of it; under "any" when it covers any of it at
-    all. "any" is the more generous rule, so its frame count is always greater
-    than or equal to "majority" on the same input.
-
-    Segments are normalized internally, so raw loader segments are safe to
-    pass. Anything past `duration_s` is dropped by the frame grid.
+    "majority" needs speech over at least half a frame, "any" over any of it.
+    Normalizes internally; anything past duration_s falls off the grid.
     """
     if rule not in ("majority", "any"):
         raise ValueError(f"unknown rule {rule!r}, expected 'majority' or 'any'")
@@ -154,16 +116,10 @@ def bridge_segments(
     segments: list[tuple[float, float]],
     max_gap_s: float,
 ) -> list[tuple[float, float]]:
-    """Merge consecutive segments separated by less than `max_gap_s`.
+    """Merge consecutive segments separated by less than max_gap_s.
 
-    This is the deliberate, parameterized counterpart to the artifact cleanup
-    in `normalize_segments`: here we are knowingly relabeling short genuine
-    silences (breaths, stop closures) as speech, because a VAD that chatters
-    on and off through them is worse than one that rides across.
-
-    Only gaps between two segments are bridged. The leading silence before the
-    first segment and the trailing silence after the last are real non-speech
-    and are never touched, since there is nothing on the far side to join to.
+    Unlike normalize_segments this relabels real silence as speech. Leading and
+    trailing silence are never touched.
     """
     normalized = normalize_segments(segments)
     if len(normalized) < 2:
@@ -186,12 +142,9 @@ def segments_from_frames(
     labels: np.ndarray,
     fps: int = DEFAULT_FPS,
 ) -> list[tuple[float, float]]:
-    """Inverse of `rasterize`: 0/1 frames back to (start, end) segments.
+    """Inverse of rasterize. A run [i, j] becomes (i/fps, (j+1)/fps).
 
-    A run of speech frames [i, j] becomes (i/fps, (j+1)/fps), so boundaries
-    land on the frame grid. Round-tripping a segment list therefore recovers
-    the same regions to within one frame at each edge, which is the resolution
-    the grid has.
+    A round trip recovers the original regions to within one frame at each edge.
     """
     flags = np.asarray(labels).astype(bool).astype(np.int8)
     if flags.size == 0:
@@ -207,13 +160,7 @@ def segments_from_frames(
 
 
 def make_labels(clip, fps: int = DEFAULT_FPS, bridge_gap_s: float = 0.2) -> dict:
-    """Build the literal and bridged frame labels for one clip.
-
-    `literal` rasterizes the normalized segments. `bridged` rasterizes those
-    same segments after short gaps are filled. Both arrays share one frame
-    grid derived from the clip duration, so they can be compared elementwise
-    and stacked without any realignment.
-    """
+    """Literal and bridged frame labels for one clip, on a shared grid."""
     segments_literal = normalize_segments(clip.segments)
     segments_bridged = bridge_segments(segments_literal, bridge_gap_s)
 

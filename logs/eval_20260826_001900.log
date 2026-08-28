@@ -1,0 +1,68 @@
+
+bigru_bridged on test  (trained on bridged labels)
+  Every threshold is chosen on the validation split and applied unchanged to the evaluation split. EER and the areas under the curves need no threshold and are computed on the evaluation split directly. No number here was tuned on test.
+
+  literal labels (cross-reference)
+    EER   6.05%   ROC-AUC 0.9720   PR-AUC 0.9871   (0.50 h, 81.6% speech)
+    FA target    10/h  threshold 0.9966 (from val)  ->  test FRR 88.74%  realized   48.3 fa/h  segment F1 0.000
+    FA target   100/h  threshold 0.9943 (from val)  ->  test FRR 44.18%  realized  169.1 fa/h  segment F1 0.003
+
+  bridged labels (primary)
+    EER   2.02%   ROC-AUC 0.9951   PR-AUC 0.9981   (0.50 h, 82.9% speech)
+    FA target    10/h  threshold 0.9947 (from val)  ->  test FRR 49.72%  realized   10.1 fa/h  segment F1 0.000
+    FA target   100/h  threshold 0.6286 (from val)  ->  test FRR  2.37%  realized   80.5 fa/h  segment F1 0.748
+
+  wrote runs/bigru_bridged/eval_test.json
+  wrote runs/bigru_bridged/det_test.png
+  wrote runs/bigru_bridged/roc_test.png
+
+attn_pw_1s on test  (trained on bridged labels)
+  Every threshold is chosen on the validation split and applied unchanged to the evaluation split. EER and the areas under the curves need no threshold and are computed on the evaluation split directly. No number here was tuned on test.
+
+  literal labels (cross-reference)
+    EER   5.68%   ROC-AUC 0.9777   PR-AUC 0.9919   (0.50 h, 81.6% speech)
+    FA target    10/h  threshold 0.9956 (from val)  ->  test FRR 87.14%  realized   18.1 fa/h  segment F1 0.002
+    FA target   100/h  threshold 0.9661 (from val)  ->  test FRR 38.77%  realized  106.7 fa/h  segment F1 0.032
+
+  bridged labels (primary)
+    EER   2.47%   ROC-AUC 0.9931   PR-AUC 0.9977   (0.50 h, 82.9% speech)
+    FA target    10/h  threshold 0.9946 (from val)  ->  test FRR 83.47%  realized   10.1 fa/h  segment F1 0.000
+    FA target   100/h  threshold 0.7548 (from val)  ->  test FRR  5.76%  realized   54.4 fa/h  segment F1 0.225
+
+  wrote runs/attn_pw_1s/eval_test.json
+  wrote runs/attn_pw_1s/det_test.png
+  wrote runs/attn_pw_1s/roc_test.png
+
+bigru_augmented on test  (trained on bridged labels)
+  Every threshold is chosen on the validation split and applied unchanged to the evaluation split. EER and the areas under the curves need no threshold and are computed on the evaluation split directly. No number here was tuned on test.
+
+  literal labels (cross-reference)
+    EER   5.88%   ROC-AUC 0.9739   PR-AUC 0.9897   (0.50 h, 81.6% speech)
+    FA target    10/h  threshold 0.9977 (from val)  ->  test FRR 96.44%  realized    4.0 fa/h  segment F1 0.000
+    FA target   100/h  threshold 0.9942 (from val)  ->  test FRR 57.09%  realized   98.6 fa/h  segment F1 0.003
+
+  bridged labels (primary)
+    EER   2.05%   ROC-AUC 0.9948   PR-AUC 0.9983   (0.50 h, 82.9% speech)
+    FA target    10/h  threshold 0.9957 (from val)  ->  test FRR 73.06%  realized    2.0 fa/h  segment F1 0.000
+    FA target   100/h  threshold 0.5491 (from val)  ->  test FRR  2.46%  realized   78.5 fa/h  segment F1 0.694
+
+  wrote runs/bigru_augmented/eval_test.json
+  wrote runs/bigru_augmented/det_test.png
+  wrote runs/bigru_augmented/roc_test.png
+
+attn_augmented on test  (trained on bridged labels)
+  Every threshold is chosen on the validation split and applied unchanged to the evaluation split. EER and the areas under the curves need no threshold and are computed on the evaluation split directly. No number here was tuned on test.
+
+  literal labels (cross-reference)
+    EER   5.97%   ROC-AUC 0.9765   PR-AUC 0.9915   (0.50 h, 81.6% speech)
+    FA target    10/h  threshold 0.9974 (from val)  ->  test FRR 93.53%  realized    8.1 fa/h  segment F1 0.001
+    FA target   100/h  threshold 0.9911 (from val)  ->  test FRR 40.87%  realized  112.7 fa/h  segment F1 0.015
+
+  bridged labels (primary)
+    EER   2.96%   ROC-AUC 0.9930   PR-AUC 0.9978   (0.50 h, 82.9% speech)
+    FA target    10/h  threshold 0.9969 (from val)  ->  test FRR 87.21%  realized    6.0 fa/h  segment F1 0.000
+    FA target   100/h  threshold 0.8021 (from val)  ->  test FRR  6.60%  realized   48.3 fa/h  segment F1 0.180
+
+  wrote runs/attn_augmented/eval_test.json
+  wrote runs/attn_augmented/det_test.png
+  wrote runs/attn_augmented/roc_test.png

@@ -1,21 +1,4 @@
-"""Cross-check the provided labels against Silero VAD.
-
-Silero VAD is a small pretrained neural voice activity detector, MIT licensed,
-CPU only, no account and no payment. It is fetched through torch.hub from
-snakers4/silero-vad.
-
-The first run needs network access. torch.hub caches the repository and weights
-under ~/.cache/torch/hub, and every later run is offline. If the fetch fails
-this module raises `SileroUnavailable` with instructions. It never substitutes
-a fallback detector or synthetic probabilities: a fabricated second opinion is
-worse than none, because the whole point is an independent check.
-
-Audio is high-passed at 80 Hz before Silero sees it, matching the committed
-front-end in DECISIONS.md, so both sides of the comparison run on the same
-preprocessed signal.
-
-torch and torchaudio only.
-"""
+"""Silero VAD wrapper and label-agreement metrics. Needs network on first run."""
 
 from __future__ import annotations
 
@@ -42,11 +25,7 @@ class SileroUnavailable(RuntimeError):
 
 
 def load_silero(force_reload: bool = False):
-    """Load Silero VAD from the torch.hub cache, fetching it if needed.
-
-    Cached in a module global, since the corpus cross-check loads it once and
-    runs it over hundreds of clips.
-    """
+    """Load Silero VAD from the torch.hub cache, fetching it if needed."""
     global _MODEL
     if _MODEL is not None and not force_reload:
         return _MODEL
@@ -61,16 +40,8 @@ def load_silero(force_reload: bool = False):
         )
     except Exception as exc:
         raise SileroUnavailable(
-            "Could not load Silero VAD from torch.hub.\n"
-            f"  repo: {SILERO_REPO}\n"
-            f"  cause: {type(exc).__name__}: {exc}\n\n"
-            "This is expected when offline and the model is not cached yet.\n"
-            "Run once with network access to populate ~/.cache/torch/hub, after "
-            "which it works offline:\n"
-            "  python -c \"import torch; torch.hub.load('snakers4/silero-vad', "
-            "'silero_vad', trust_repo=True)\"\n\n"
-            "No fallback detector is substituted, because a fabricated second "
-            "opinion would defeat the purpose of the cross-check."
+            f"could not load {SILERO_REPO} from torch.hub: "
+            f"{type(exc).__name__}: {exc}"
         ) from exc
 
     model.eval()
@@ -85,36 +56,14 @@ def silero_speech_probs(
     n_frames: int | None = None,
     apply_highpass: bool = True,
 ) -> np.ndarray:
-    """Per-frame Silero speech probability on the project 100 fps grid.
+    """Per-frame Silero speech probability on the 100 fps grid.
 
-    Returns the raw per-window probabilities resampled onto the frame grid,
-    not Silero's post-processed `get_speech_timestamps` output. Comparing at
-    the probability level keeps either side's smoothing and hysteresis out of
-    the measurement.
-
-    Rate mapping. Silero emits one probability per 512-sample window at 16 kHz,
-    so its native grid is 31.25 fps with window k covering [k * 32, (k + 1) * 32)
-    ms. Those values are placed at window centers and **linearly interpolated**
-    onto the 100 fps frame centers. Interpolation rather than nearest because
-    nearest would quantize every threshold crossing to a 32 ms block edge and
-    add a sawtooth bias of up to 16 ms to the boundary statistics; a linear ramp
-    between two window centers puts a 0.5 crossing at the window boundary, which
-    is the best available estimate.
-
-    Interpolation does not create resolution. Silero cannot localize a boundary
-    better than its own 32 ms window, so its onsets and offsets carry an
-    inherent uncertainty of about +/- 16 ms, which is +/- 1.6 frames on this
-    grid. Any boundary bias smaller than that is not meaningful.
-
-    The model is recurrent over windows, so windows are fed sequentially with
-    the state reset at the start of each clip. Passing them as a batch would
-    give every window a fresh state and produce systematically low probabilities.
+    Silero runs at 31.25 fps; values are linearly interpolated onto frame centres,
+    which does not create resolution: its boundaries carry about +/- 16 ms.
+    Windows are fed sequentially with state reset per clip, never batched.
     """
     if sr not in SILERO_WINDOW:
-        raise ValueError(
-            f"Silero supports 8000 and 16000 Hz, got {sr}. Resample with "
-            "loader.read_audio before calling."
-        )
+        raise ValueError(f"Silero supports 8000 and 16000 Hz, got {sr}")
 
     x = np.asarray(audio, dtype=np.float32)
     if x.ndim != 1:
@@ -145,9 +94,6 @@ def silero_speech_probs(
     return np.interp(frame_centers, window_centers, probs).astype(np.float32)
 
 
-# --- comparison -----------------------------------------------------------
-
-
 def _boundaries(flags: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Onset and offset frame indices of a 0/1 array."""
     padded = np.concatenate(([0], np.asarray(flags).astype(np.int8), [0]))
@@ -156,11 +102,9 @@ def _boundaries(flags: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _collar_mask(ref: np.ndarray, tol_frames: int) -> np.ndarray:
-    """True for frames that should be scored, False inside the boundary collar.
+    """True for frames that should be scored, False inside the collar.
 
-    The collar sits around *reference* boundaries. Excluding frames near them
-    removes disagreement that is only about exactly where a transition falls,
-    leaving disagreement about whether a region is speech at all.
+    The collar sits around reference boundaries.
     """
     keep = np.ones(len(ref), dtype=bool)
     if tol_frames <= 0:
@@ -174,13 +118,10 @@ def _collar_mask(ref: np.ndarray, tol_frames: int) -> np.ndarray:
 
 
 def _boundary_bias(ref: np.ndarray, hyp: np.ndarray, fps: int, max_dist_frames: int = 50) -> dict:
-    """Signed offset of Silero boundaries against reference boundaries, in ms.
+    """Signed offset of Silero boundaries against the reference, in ms.
 
-    Positive means Silero is late: it starts speech after the reference does,
-    or ends it after. Each reference boundary is matched to the nearest
-    hypothesis boundary of the same kind within `max_dist_frames`. Unmatched
-    reference boundaries are counted rather than scored, since a missing
-    boundary is a region disagreement, not a timing one.
+    Positive means Silero is late. Unmatched reference boundaries are counted,
+    not scored.
     """
     out = {}
     deltas_all = []
@@ -246,11 +187,8 @@ def agreement(
 ) -> dict:
     """Frame agreement between reference labels and thresholded Silero probs.
 
-    Reports the metrics twice: over every frame, and again with a collar of
-    `tol_frames` around each reference boundary excluded. The gap between the
-    two says how much of the disagreement is only about boundary placement,
-    which is expected given that the two methods have different time
-    resolutions.
+    Reported with and without a tol_frames collar; the gap between the two is how
+    much of the disagreement is only boundary placement.
     """
     ref = np.asarray(ref_labels).astype(bool)
     hyp = np.asarray(silero_probs) >= threshold
@@ -279,14 +217,10 @@ def disagreement_breakdown(
     tol_frames: int = 2,
     fps: int = DEFAULT_FPS,
 ) -> dict:
-    """Split disagreement into boundary-only and wholesale region disagreement.
+    """Split disagreement into boundary-only and region runs.
 
-    A disagreement run is boundary-only when every frame in it sits inside the
-    collar around a reference boundary: the two sides agree that a transition
-    happens there and differ only on exactly where. Any run reaching beyond the
-    collar is a region disagreement, where one side calls a stretch speech and
-    the other calls it silence. The second kind is the one worth reading, since
-    it is a candidate label error rather than a method difference.
+    A run inside the collar is boundary-only; one reaching past it is a region
+    disagreement, which is the candidate label error.
     """
     ref = np.asarray(ref_labels).astype(bool)
     hyp = np.asarray(silero_probs) >= threshold

@@ -1,8 +1,4 @@
-"""Whole-corpus analysis for the VAD dataset.
-
-Writes explore_out/corpus_stats.json and annotated figures into
-explore_out/figures/, and prints the headline numbers with the three proposed
-thresholds.
+"""Whole-corpus analysis. Writes corpus_stats.json and figures.
 
     python scripts/corpus_report.py [dataset_dir] [--out DIR] [--bridge-gap S]
 """
@@ -54,9 +50,6 @@ def _save(fig, out_dir: Path, name: str, generated: list[str]) -> None:
     fig.savefig(path, dpi=140, bbox_inches="tight")
     plt.close(fig)
     generated.append(str(path))
-
-
-# --- figures --------------------------------------------------------------
 
 
 def fig_speakers(table, split, out_dir, generated):
@@ -138,7 +131,6 @@ def fig_segments_and_gaps(rows, bridging, elbow, out_dir, generated):
     fig, axes = plt.subplots(1, 3, figsize=(19, 5.4))
     palette = ["#2b6cb0", "#2f855a", "#dd6b20", "#c53030"]
 
-    # --- segment lengths ---
     ax = axes[0]
     ax.hist(lengths, bins=np.logspace(np.log10(max(lengths.min(), 1e-3)),
                                       np.log10(lengths.max()), 45), color=SPEECH_COLOR)
@@ -151,7 +143,6 @@ def fig_segments_and_gaps(rows, bridging, elbow, out_dir, generated):
     _style(ax, f"Speech segment length  ({len(lengths)} segments)",
            "segment length (s, log scale)", "segments")
 
-    # --- gap lengths, log scale, candidate thresholds ---
     ax = axes[1]
     edges = np.logspace(np.log10(max(gaps.min(), 1e-4)), np.log10(gaps.max()), 55)
     ax.hist(gaps, bins=edges, color="0.6")
@@ -182,7 +173,6 @@ def fig_segments_and_gaps(rows, bridging, elbow, out_dir, generated):
                "leading and trailing silence excluded)",
            "gap length (s, log scale)", "gaps")
 
-    # --- gap detail, linear, where the decision actually lives ---
     ax = axes[2]
     centers = np.array(elbow["bucket_centers_ms"])
     counts = np.array(elbow["bucket_counts"])
@@ -191,14 +181,14 @@ def fig_segments_and_gaps(rows, bridging, elbow, out_dir, generated):
 
     plateau = elbow["plateau_count_per_bucket"]
     ax.axhline(plateau, color="0.35", linestyle=":", linewidth=1.3)
-    ax.annotate(f"genuine-pause plateau, about {plateau:.0f} gaps per 10 ms bucket",
+    ax.annotate(f"plateau {plateau:.0f} gaps per 10 ms bucket",
                 (400, plateau), xytext=(-6, 7), textcoords="offset points",
                 fontsize=8.5, ha="right", color="0.3")
 
     elbow_ms = elbow["elbow_ms"]
     ax.axvspan(0, elbow_ms, color=SPEECH_COLOR, alpha=0.10)
     ax.axvline(elbow_ms, color="black", linewidth=1.8)
-    ax.annotate(f"elbow {elbow_ms:.0f} ms\naligner artifact cluster ends here",
+    ax.annotate(f"elbow {elbow_ms:.0f} ms",
                 (elbow_ms, ax.get_ylim()[1] * 0.72), xytext=(10, 0),
                 textcoords="offset points", fontsize=9, va="top", fontweight="bold",
                 bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="0.6"))
@@ -210,15 +200,10 @@ def fig_segments_and_gaps(rows, bridging, elbow, out_dir, generated):
             ax.annotate(f"{t_ms:.0f}", (t_ms, ax.get_ylim()[1] * 0.97), rotation=90,
                         fontsize=8, ha="right", va="top", color=palette[i])
 
-    ax.text(0.97, 0.44,
-            "left of the elbow: steep decay,\nartifacts and stop closures\n\n"
-            "right of the elbow: flat plateau,\ngenuine pauses",
-            transform=ax.transAxes, fontsize=8.5, va="top", ha="right", color="0.25",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="0.85"))
     _style(ax, "Gap detail, 10 ms buckets  (93 percent of gaps are exact 10 ms multiples)",
            "gap length (ms, linear)", "gaps")
 
-    fig.suptitle("Segment and gap structure: choosing the bridging threshold", fontsize=13)
+    fig.suptitle("Segment and gap structure", fontsize=13)
     fig.tight_layout()
     _save(fig, out_dir, "segments_and_gaps.png", generated)
 
@@ -251,12 +236,6 @@ def fig_snr(snr, snr_hp, gate, n_skipped, cutoff_hz, out_dir, generated):
     ax.axvline(gate["threshold_db"], color=ACCENT, linewidth=1.4, linestyle="--")
     _style(ax, f"SNR gained by the {cutoff_hz:.0f} Hz high-pass",
            "SNR as recorded (dB)", "SNR gain (dB)")
-    ax.text(0.97, 0.95,
-            "the low-SNR population gains the most:\n"
-            "much of it is rumble in the silence frames,\n"
-            "not broadband noise on the speech",
-            transform=ax.transAxes, fontsize=8.5, ha="right", va="top", color="0.25",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="0.85"))
 
     fig.suptitle("SNR and the clean vs degraded gate", fontsize=12)
     fig.tight_layout()
@@ -344,17 +323,11 @@ def fig_highpass_demo(clip, cutoff_hz, out_dir, generated):
             title=f"{tag}   sub-80 Hz share of silence energy: {value * 100:.1f}%",
         )
 
-    fig.suptitle(
-        f"Low-frequency rumble, {clip.stem} (speaker {clip.speaker_id}), "
-        f"worst clip by sub-80 Hz energy in labeled silence",
-        fontsize=12.5, y=0.995,
-    )
+    fig.suptitle(f"Low-frequency rumble, {clip.stem} (speaker {clip.speaker_id})",
+                 fontsize=12.5, y=0.995)
     _save(fig, out_dir, "rumble_highpass.png", generated)
     return {"lf_in_silence_before": before, "lf_in_silence_after": after,
             "cutoff_hz": cutoff_hz}
-
-
-# --- main -----------------------------------------------------------------
 
 
 def main() -> int:
@@ -370,10 +343,8 @@ def main() -> int:
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     clips = load_dataset(args.directory)
-    print(f"analyzing {len(clips)} clips from {os.path.expanduser(args.directory)} ...")
-    rows = S.analyze_corpus(clips, bridge_gap_s=args.bridge_gap)
+    rows = [S.analyze_clip(c, bridge_gap_s=args.bridge_gap) for c in clips]
 
-    # --- aggregate ---
     durations = [r["duration_s"] for r in rows]
     total_frames = sum(r["n_frames"] for r in rows)
     overall = {
@@ -415,7 +386,6 @@ def main() -> int:
     lengths = [x for r in rows for x in r["segment_lengths_s"]]
     gaps = [g for r in rows for g in r["gaps_s"]]
 
-    # --- figures ---
     generated: list[str] = []
     fig_speakers(table, split, fig_dir, generated)
     fig_durations(rows, fig_dir, generated)
@@ -428,7 +398,6 @@ def main() -> int:
     worst = next(c for c in clips if c.stem == top_rumble[0]["stem"])
     highpass = fig_highpass_demo(worst, args.highpass_hz, fig_dir, generated)
 
-    # --- json ---
     payload = {
         "dataset_dir": os.path.expanduser(args.directory),
         "frame_grid": {"sample_rate": 16000, "hop_ms": 10, "win_ms": 25, "fps": 100},
@@ -520,15 +489,14 @@ def main() -> int:
     _print_summary(payload, table, split, bridging, elbow, snr_gate, rumble_gate,
                    profile, top_rumble, highpass)
 
-    print("\ngenerated files")
     for path in sorted(generated):
-        print(f"  {path}  ({os.path.getsize(path):,} bytes)")
+        print(path)
     return 0
 
 
 def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, profile, top_rumble, highpass):
     c, d = p["corpus"], p["duration_s"]
-    print(f"\n{'=' * 78}\nCORPUS\n{'=' * 78}")
+    print("\ncorpus")
     print(f"  clips {c['n_clips']}   hours {c['total_hours']:.2f}   "
           f"speakers {c['n_speakers']}   chapters {c['n_chapters']}")
     print(f"  duration  min {d['min']:.2f}s  median {d['median']:.2f}s  "
@@ -541,7 +509,7 @@ def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, prof
     for s in table["speakers"]:
         print(f"{s:>9} {table['clips'][s]:6d} {table['minutes'][s]:8.1f} {table['chapters'][s]:9d}")
 
-    print(f"\n{'=' * 78}\nPROPOSED SPEAKER-DISJOINT SPLIT (proposal only, not committed in code)\n{'=' * 78}")
+    print("\nproposed speaker-disjoint split")
     for part in ("train", "val", "test"):
         v = split["partitions"][part]
         print(f"  {part:<5} {v['n_speakers']:2d} speakers  {v['n_clips']:4d} clips "
@@ -549,21 +517,20 @@ def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, prof
         print(f"        {', '.join(v['speakers'])}")
 
     cb = p["class_balance"]
-    print(f"\n{'=' * 78}\nCLASS BALANCE\n{'=' * 78}")
+    print("\nclass balance")
     print(f"  literal  speech {cb['overall_speech_fraction_literal']*100:.1f}% of all frames "
           f"({cb['imbalance_ratio_literal']:.2f} : 1 speech to non-speech)")
     print(f"  bridged  speech {cb['overall_speech_fraction_bridged']*100:.1f}% of all frames "
           f"({cb['imbalance_ratio_bridged']:.2f} : 1)")
 
     seg, gap = p["segments"], p["gaps"]
-    print(f"\n{'=' * 78}\nSEGMENTS AND GAPS\n{'=' * 78}")
+    print("\nsegments and gaps")
     print(f"  segments {seg['n_segments']}  median length {seg['length_s']['median']*1000:.0f} ms  "
           f"mean {seg['segments_per_clip']['mean']:.1f} per clip")
     print(f"  gaps     {gap['n_gaps']}  median {gap['length_s']['median']*1000:.0f} ms  "
           f"p95 {gap['length_s']['p95']*1000:.0f} ms")
-    print(f"  distribution elbow at {elbow['elbow_ms']:.0f} ms: the short-gap cluster decays into a")
-    print(f"  flat genuine-pause plateau of about {elbow['plateau_count_per_bucket']:.0f} gaps "
-          f"per 10 ms bucket beyond it")
+    print(f"  elbow {elbow['elbow_ms']:.0f} ms, plateau "
+          f"{elbow['plateau_count_per_bucket']:.0f} gaps per 10 ms bucket")
     print(f"\n  {'threshold':>10} {'gaps bridged':>14} {'seg/clip':>10} {'speech frac':>12} {'delta':>8}")
     for e in bridging:
         print(f"  {e['threshold_s']*1000:8.0f}ms {e['gap_fraction_bridged']*100:13.1f}% "
@@ -571,7 +538,7 @@ def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, prof
               f"{e['speech_fraction_delta']*100:+7.1f}%")
 
     sn = p["snr"]
-    print(f"\n{'=' * 78}\nSNR\n{'=' * 78}")
+    print("\nsnr")
     print(f"  measured on {sn['n_measured']} clips, {sn['n_skipped_no_silence']} skipped (no silence frames)")
     print(f"  min {sn['db']['min']:.1f}  p05 {sn['db']['p05']:.1f}  median {sn['db']['median']:.1f}  "
           f"p95 {sn['db']['p95']:.1f}  max {sn['db']['max']:.1f} dB")
@@ -585,7 +552,7 @@ def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, prof
     print(f"    corr(sub-80 Hz share in silence, SNR) = {hp['corr_rumble_vs_snr']:.2f}")
 
     ru = p["rumble"]
-    print(f"\n{'=' * 78}\nLOW-FREQUENCY RUMBLE (below {S.RUMBLE_HZ:.0f} Hz)\n{'=' * 78}")
+    print(f"\nlow-frequency rumble, below {S.RUMBLE_HZ:.0f} Hz")
     print(f"  whole clip      median {ru['lf_fraction_all']['median']:.4f}  max {ru['lf_fraction_all']['max']:.4f}")
     print(f"  labeled silence median {ru['lf_fraction_silence']['median']:.4f}  "
           f"max {ru['lf_fraction_silence']['max']:.4f}")
@@ -594,12 +561,12 @@ def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, prof
         print(f"    {r['stem']:20s} speaker {r['speaker_id']:>5}  "
               f"silence {r['lf_fraction_silence']:.3f}  whole {r['lf_fraction_all']:.3f}")
 
-    print(f"\n{'=' * 78}\nPOSITION\n{'=' * 78}")
+    print("\nposition")
     print(f"  P(speech)  first decile {profile['first_decile_mean']*100:.1f}%   "
           f"middle {profile['middle_mean']*100:.1f}%   "
           f"last decile {profile['last_decile_mean']*100:.1f}%")
 
-    print(f"\n{'=' * 78}\nPROPOSED THRESHOLDS\n{'=' * 78}")
+    print("\nproposed thresholds")
     # smallest candidate at or above the elbow: past it, extra bridging only
     # deletes genuine pauses at the plateau rate for no artifact benefit
     above = [e for e in bridging if e["threshold_s"] * 1000 >= elbow["elbow_ms"]]
@@ -608,24 +575,13 @@ def _print_summary(p, table, split, bridging, elbow, snr_gate, rumble_gate, prof
           f"closes {chosen['gap_fraction_bridged']*100:.1f}% of gaps, "
           f"speech {chosen['speech_fraction']*100:.1f}%, "
           f"{chosen['mean_segments_per_clip']:.1f} seg/clip")
-    print(f"     chosen as the smallest candidate at or above the {elbow['elbow_ms']:.0f} ms elbow. "
-          f"Larger values")
-    print(f"     mostly delete genuine pauses: 100 to 200 ms adds only "
-          f"{(bridging[2]['gap_fraction_bridged']-bridging[0]['gap_fraction_bridged'])*100:.1f} "
-          f"points of gaps bridged.")
     print(f"  2. SNR gate       {snr_gate['threshold_db']:.0f} dB   "
           f"{snr_gate['n_clean']} clean (augmentable) / {snr_gate['n_degraded']} degraded (use raw)")
     print(f"  3. rumble gate    {rumble_gate['threshold_lf_fraction_in_silence']:.2f} "
           f"sub-80 Hz share in silence   {rumble_gate['n_above']} clips above")
-    print(f"     an {highpass['cutoff_hz']:.0f} Hz high-pass takes the worst clip from "
+    print(f"     {highpass['cutoff_hz']:.0f} Hz high-pass takes the worst clip from "
           f"{highpass['lf_in_silence_before']*100:.1f}% to "
           f"{highpass['lf_in_silence_after']*100:.1f}% sub-80 Hz energy in silence")
-    hp = p["snr"]["highpass_effect"]
-    print(f"\n  ORDER OF OPERATIONS: apply the high-pass before the SNR gate. It halves the")
-    print(f"  degraded population ({hp['n_below_gate_before']} to {hp['n_below_gate_after']} clips "
-          f"below {snr_gate['threshold_db']:.0f} dB), because much of the")
-    print(f"  low-SNR mode is rumble sitting in the silence frames rather than noise on")
-    print(f"  the speech. Gating first would wrongly exclude those clips from augmentation.")
 
 
 if __name__ == "__main__":

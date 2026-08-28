@@ -1445,12 +1445,7 @@
             "collar_s": 0.05,
             "precision": 0.0,
             "recall": 0.0,
-            "f1": 0.0,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.0
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.0,
@@ -1481,12 +1476,7 @@
             "collar_s": 0.05,
             "precision": 0.7269938650306749,
             "recall": 0.7707317073170732,
-            "f1": 0.7482241515390686,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.7482241515390686
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.7482241515390686,
@@ -2956,12 +2946,7 @@
             "collar_s": 0.05,
             "precision": 0.0,
             "recall": 0.0,
-            "f1": 0.0,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.0
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.0,
@@ -2992,12 +2977,7 @@
             "collar_s": 0.05,
             "precision": 0.0,
             "recall": 0.0,
-            "f1": 0.0,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.0
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.0,
@@ -3072,12 +3052,7 @@
             "collar_s": 0.05,
             "precision": 0.041312272174969626,
             "recall": 0.055284552845528454,
-            "f1": 0.04728789986091795,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.04728789986091795
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.04728789986091795,
@@ -3152,12 +3127,7 @@
             "collar_s": 0.05,
             "precision": 0.058333333333333334,
             "recall": 0.07967479674796749,
-            "f1": 0.06735395189003437,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.06735395189003437
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.06735395189003437,
@@ -3232,12 +3202,7 @@
             "collar_s": 0.05,
             "precision": 0.17797443461160276,
             "recall": 0.2943089430894309,
-            "f1": 0.22181372549019607,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.22181372549019607
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.22181372549019607,
@@ -3312,12 +3277,7 @@
             "collar_s": 0.05,
             "precision": 0.07172995780590717,
             "recall": 0.16585365853658537,
-            "f1": 0.10014727540500738,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.10014727540500738
           },
           "test_segment_f1_by_collar": {
             "0.050": 0.10014727540500738,

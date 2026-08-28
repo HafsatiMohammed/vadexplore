@@ -1,9 +1,5 @@
-"""Save inspection figures for a small representative set of clips.
-
-The selection is deliberately extreme rather than random: the clips most
-likely to break an assumption are the shortest, the longest, and the ones at
-either end of the speech fraction range. Two seeded random picks are included
-so the set is not purely pathological.
+"""Inspection figures for a deliberately extreme set of clips: shortest,
+longest, either end of the speech fraction range, plus two seeded random picks.
 
     python scripts/plot_examples.py [dataset_dir] [--out DIR] [--seed N]
                                     [--max-seconds S] [--n-random K]

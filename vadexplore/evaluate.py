@@ -1,14 +1,7 @@
-"""Evaluate a trained VAD checkpoint, and score any other system the same way.
+"""Evaluate a trained checkpoint, and score any other system the same way.
 
-Operating-point discipline. Any number that requires a threshold has that
-threshold chosen on the VALIDATION split and then applied unchanged to TEST.
-Nothing is ever tuned on test. EER and the areas under the curves need no
-threshold and are computed on test directly. Every reported operating point
-records which split its threshold came from, so the distinction survives into
-the json.
-
-Metric primitives are imported from `vadexplore.train` rather than rewritten,
-so the numbers here are the same numbers the training loop selected on.
+Thresholds are chosen on validation and applied unchanged to test. EER and the
+areas under the curves need no threshold and are computed on test directly.
 """
 
 from __future__ import annotations
@@ -53,15 +46,10 @@ def _resolve(path) -> Path:
     return Path(os.path.expanduser(str(path)))
 
 
-# --- prediction container -------------------------------------------------
-
-
 class Predictions:
     """Per-frame scores and labels for one split, kept clip by clip.
 
-    Clip boundaries matter: false-alarm events must not merge across clips, and
-    segment scoring is per clip. The flat views are built once for the
-    frame-level metrics.
+    Clip boundaries matter: false-alarm events must not merge across clips.
     """
 
     def __init__(self, scores: list[np.ndarray], labels: list[np.ndarray],
@@ -110,9 +98,6 @@ def collect_predictions(model, dataset, device, batch_size: int = 8) -> Predicti
     return Predictions(scores, labels, stems)
 
 
-# --- threshold-free metrics -----------------------------------------------
-
-
 def average_precision(scores: np.ndarray, labels: np.ndarray) -> float:
     """Area under the precision-recall curve, by the step-wise definition."""
     positive = labels.astype(bool)
@@ -129,9 +114,7 @@ def curve_points(predictions: Predictions, n_points: int = N_CURVE_POINTS,
                  min_fa_frames: int = DEFAULT_MIN_FA_FRAMES) -> dict:
     """ROC and DET points on a threshold grid.
 
-    The DET axis is false alarms per hour rather than a false-alarm rate,
-    because that is the unit the operating points are specified in and the unit
-    a deployment budget is written in.
+    The DET axis is false alarms per hour, the unit a deployment budget uses.
     """
     scores, labels = predictions.scores, predictions.labels
     grid = np.unique(np.quantile(scores, np.linspace(0.0, 1.0, n_points)))
@@ -168,16 +151,12 @@ def threshold_free_metrics(predictions: Predictions) -> dict:
     }
 
 
-# --- operating points -----------------------------------------------------
-
-
 def threshold_for_fa_budget(predictions: Predictions, target_fa_per_hour: float,
                             n_points: int = N_CURVE_POINTS,
                             min_fa_frames: int = DEFAULT_MIN_FA_FRAMES) -> dict:
-    """Pick the threshold meeting a false-alarm budget with the lowest miss rate.
+    """Threshold meeting a false-alarm budget at the lowest miss rate.
 
-    Intended to be called on validation. The returned threshold is then frozen
-    and applied to test by `score_at_threshold`.
+    Call it on validation; the result is frozen and handed to score_at_threshold.
     """
     best = None
     for row in curve_points(predictions, n_points, min_fa_frames)["points"]:
@@ -221,44 +200,11 @@ def score_at_threshold(predictions: Predictions, threshold: float,
     }
 
 
-# --- segment level --------------------------------------------------------
-
-
-def postprocess_frames(frames: np.ndarray, fps: int = 100,
-                       min_speech_s: float | None = None,
-                       min_silence_s: float | None = None) -> np.ndarray:
-    """Optional duration filters. Both off by default.
-
-    These are the hooks the post-processing section will sweep. Evaluation here
-    deliberately scores raw thresholded output, so that section has an
-    unsmoothed baseline to improve on.
-    """
-    frames = np.asarray(frames).astype(bool)
-    if min_silence_s:
-        segments = segments_from_frames(~frames, fps)
-        for start, end in segments:
-            if end - start < min_silence_s:
-                frames[int(round(start * fps)):int(round(end * fps))] = True
-    if min_speech_s:
-        segments = segments_from_frames(frames, fps)
-        for start, end in segments:
-            if end - start < min_speech_s:
-                frames[int(round(start * fps)):int(round(end * fps))] = False
-    return frames
-
-
 def match_segments(reference: list, hypothesis: list, collar_s: float) -> dict:
     """One-to-one segment matching with a boundary collar.
 
-    A hypothesis segment matches a reference segment when both its start and
-    its end fall within `collar_s` of the reference's. The collar exists
-    because two systems that agree a word is present will still disagree about
-    exactly where it starts, by an amount comparable to the frame rate. Matching
-    is greedy on the smallest total boundary error, and each segment is used at
-    most once.
-
-    An offset of exactly `collar_s` matches, so a round collar means what the
-    caller wrote rather than what its float representation happens to be.
+    Both start and end must land within collar_s. Greedy on the smallest total
+    boundary error, each segment used at most once.
     """
     pairs = []
     for i, (ref_start, ref_end) in enumerate(reference):
@@ -289,15 +235,11 @@ def match_segments(reference: list, hypothesis: list, collar_s: float) -> dict:
 
 
 def segment_metrics(predictions: Predictions, threshold: float,
-                    collar_s: float = DEFAULT_COLLAR_S,
-                    min_speech_s: float | None = None,
-                    min_silence_s: float | None = None) -> dict:
+                    collar_s: float = DEFAULT_COLLAR_S) -> dict:
     """Segment precision, recall, and F1 over the split, pooled across clips."""
     totals = {"matched": 0, "n_reference": 0, "n_hypothesis": 0}
     for scores, labels in zip(predictions.per_clip_scores, predictions.per_clip_labels):
-        frames = postprocess_frames(scores >= threshold, predictions.fps,
-                                    min_speech_s, min_silence_s)
-        hypothesis = segments_from_frames(frames, predictions.fps)
+        hypothesis = segments_from_frames(scores >= threshold, predictions.fps)
         reference = segments_from_frames(labels, predictions.fps)
         result = match_segments(reference, hypothesis, collar_s)
         for key in totals:
@@ -311,12 +253,7 @@ def segment_metrics(predictions: Predictions, threshold: float,
         "precision": precision,
         "recall": recall,
         "f1": 2 * precision * recall / max(precision + recall, 1e-12),
-        "postprocessing": {"min_speech_s": min_speech_s, "min_silence_s": min_silence_s,
-                           "note": "off by default; swept in the post-processing section"},
     }
-
-
-# --- figures --------------------------------------------------------------
 
 
 def _style(ax, title, xlabel, ylabel):
@@ -371,9 +308,6 @@ def plot_roc(curves: dict, path: Path, title: str) -> None:
     plt.close(fig)
 
 
-# --- top level ------------------------------------------------------------
-
-
 def evaluate_run(
     run_dir,
     split: str = "test",
@@ -385,14 +319,9 @@ def evaluate_run(
     write: bool = True,
     convention: str | None = None,
 ) -> dict:
-    """Evaluate one checkpoint on `split`, choosing every threshold on validation.
+    """Evaluate one checkpoint, every threshold chosen on validation.
 
-    Both label conventions are always scored. `convention` only decides which
-    one is labelled primary and which is the cross-reference, and defaults to
-    the one the checkpoint was trained on. Overriding it is for the
-    label-convention sensitivity study, where a model is deliberately read
-    against the convention it did not train on; the checkpoint's own value is
-    kept in the output either way so the two never get confused.
+    Both conventions are always scored; convention only picks which is primary.
     """
     run_dir = _resolve(run_dir)
     device = resolve_device(device) if isinstance(device, str) or device is None else device
@@ -507,13 +436,8 @@ def summarize(results: dict) -> None:
     if primary != trained_on:
         header += f", reported primary against {primary}"
     print(header + ")")
-    print(f"  {results['discipline']}")
     if results.get("threshold_split_equals_eval_split"):
-        print("  WARNING: the evaluation split is val, which is also where the "
-              "thresholds come from.\n"
-              "  The operating points below are selected on the data they are "
-              "scored on and read\n"
-              "  optimistically. Threshold-free metrics (EER, AUC) are unaffected.")
+        print("  WARNING: thresholds come from val and are scored on val")
     for convention, entry in results["conventions"].items():
         free = entry[f"threshold_free_on_{split}"]
         print(f"\n  {convention} labels ({entry['role']})")
@@ -528,9 +452,6 @@ def summarize(results: dict) -> None:
                   f"{split} FRR {frame['frr']*100:5.2f}%  "
                   f"realized {frame['fa_per_hour']:6.1f} fa/h  "
                   f"segment F1 {segment['f1']:.3f}")
-
-
-# --- CLI ------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -579,7 +500,7 @@ def main(argv=None) -> int:
 
     summarize(results)
     print(f"\n  wrote {run_dir / f'eval_{args.split}.json'}")
-    for name, path in results.get("figures", {}).items():
+    for path in results.get("figures", {}).values():
         print(f"  wrote {path}")
     return 0
 

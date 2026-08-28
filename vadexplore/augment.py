@@ -1,32 +1,4 @@
-"""Noise and reverberation augmentation for VAD training and robustness testing.
-
-Applied to the waveform, before the committed high-pass and the feature stack.
-Labels are never touched: both operations are defined so that speech onsets and
-offsets stay where the aligner put them.
-
-Reverberation. Speech is convolved with a room impulse response from the
-target category, then realigned on the RIR's `direct_path_sample` so the
-propagation delay does not slide speech relative to its labels. The RIR is
-normalized by its direct-path energy, so the direct sound arrives at the level
-it left at and only the reverberant tail is added. After that alignment reverb
-does not move a boundary. What it does do is smear energy past each offset,
-which is the thing the model has to learn to see through, and which is exactly
-why a clean-trained model over-extends in a live room.
-
-Additive noise. A MUSAN music or noise clip, optionally convolved with a
-noise-category RIR so the interferer sits in the same room, scaled to a target
-SNR measured over the speech-active frames only. Measuring over the whole clip
-would let the silence fraction set the level, and this corpus is 80 percent
-speech, so the two differ by a lot.
-
-Order is talker first, then interferer: reverberate the speech as it travels to
-the microphone, then add the noise that arrives there.
-
-Resource disjointness is enforced, not assumed. Training draws from the RIR
-bank's train split and the MUSAN train pool; test conditions draw from the hard
-split and the MUSAN test pool. A room or a noise recording used in training
-never appears in an evaluation condition.
-"""
+"""Reverb and noise augmentation on the waveform. Labels are never touched."""
 
 from __future__ import annotations
 
@@ -61,15 +33,8 @@ def _resolve(path) -> Path:
     return Path(os.path.expanduser(str(path)))
 
 
-# --- resource banks -------------------------------------------------------
-
-
 class RIRBank:
-    """Room impulse responses, filtered to one category and one split.
-
-    `echo` is excluded by construction. It models the device's own loudspeaker
-    at 5 to 25 cm, which has nothing to do with whether a person is talking.
-    """
+    """Room impulse responses for one category and one split. echo is excluded."""
 
     def __init__(self, rir_dir, category: str = "target", split: str = "train"):
         if category not in RIR_CATEGORIES:
@@ -119,13 +84,9 @@ class RIRBank:
 
 def musan_pool(musan_dir, split: str = "train",
                train_percent: int = MUSAN_TRAIN_PERCENT) -> list[Path]:
-    """MUSAN files for one pool, partitioned deterministically by filename.
+    """MUSAN files for one pool, split by md5 of the path relative to the root.
 
-    The partition is a hash of the path relative to the MUSAN root, so it does
-    not depend on directory order, on how many files happen to be present, or
-    on any random seed. A recording is in the same pool on every machine and in
-    every run, which is what makes the train and test pools genuinely disjoint
-    rather than disjoint by luck.
+    Independent of directory order, file count, and any seed.
     """
     if split not in ("train", "test"):
         raise ValueError(f"MUSAN split must be train or test, got {split!r}")
@@ -156,18 +117,11 @@ def _read_musan(path_str: str) -> np.ndarray:
     return audio
 
 
-# --- the operations -------------------------------------------------------
-
-
 def apply_rir(audio: np.ndarray, impulse: np.ndarray, direct_path: int) -> np.ndarray:
     """Convolve and realign on the direct path, preserving length.
 
-    `np.convolve` puts the direct arrival of input sample 0 at output index
-    `direct_path`, so slicing from there undoes the propagation delay and input
-    sample t lines up with output sample t again. Without this the whole
-    utterance would slide later by the time of flight, which is tens of
-    milliseconds at conversational distances and would silently break the
-    alignment between audio and labels.
+    Slicing from direct_path undoes the propagation delay; without it the whole
+    utterance slides later by tens of milliseconds and the labels stop matching.
     """
     audio = np.asarray(audio, dtype=np.float32)
     if audio.size == 0:
@@ -183,18 +137,8 @@ def match_level(reverberant: np.ndarray, dry: np.ndarray,
                 speech_mask: np.ndarray) -> np.ndarray:
     """Rescale a reverberated signal to the dry speech-active RMS.
 
-    Direct-path normalization makes the direct arrival come out at the level it
-    went in at, which is what keeps the convolution physically meaningful, but
-    it does not keep the total level fixed. In this RIR bank it is nowhere near
-    fixed: the median target-room DRR is about -3.6 dB, meaning the reverberant
-    tail carries more energy than the direct sound, and the measured overall
-    gain runs from +0.7 to +17.5 dB across rooms.
-
-    Left alone that would feed the model a level shift of up to 17 dB on top of
-    the reverberation, which is a second, uncontrolled variable, and the input
-    is normalized with fixed training statistics so the shift does not wash
-    out. Matching the level afterwards isolates what reverb is supposed to
-    test: the shape of the smearing, not the loudness.
+    Direct-path normalization fixes the direct arrival, not the total: overall
+    gain runs +0.7 to +17.5 dB across this bank, a second uncontrolled variable.
     """
     where = speech_mask if speech_mask.any() else np.ones(len(dry), bool)
     dry_rms = float(np.sqrt(np.mean(dry[where] ** 2)))
@@ -228,12 +172,10 @@ def fit_noise(noise: np.ndarray, length: int, rng: np.random.Generator) -> np.nd
 
 def add_noise_at_snr(speech: np.ndarray, noise: np.ndarray, snr_db: float,
                      speech_mask: np.ndarray) -> tuple[np.ndarray, float]:
-    """Mix noise into speech at an SNR measured over speech-active samples only.
+    """Mix noise into speech at an SNR measured over speech-active samples.
 
-    Measuring speech power over the whole clip would fold the silences into the
-    numerator and make the realized SNR depend on how talkative the clip is.
-    This corpus runs about 80 percent speech and individual clips range from 49
-    to 93 percent, so that choice would move the true SNR by several dB.
+    Whole-clip power would make the realized SNR depend on how talkative the clip
+    is; clips here run 49 to 93 percent speech.
     """
     speech = np.asarray(speech, dtype=np.float32)
     noise = np.asarray(noise, dtype=np.float32)
@@ -249,9 +191,6 @@ def add_noise_at_snr(speech: np.ndarray, noise: np.ndarray, snr_db: float,
 
     scale = float(np.sqrt(speech_power / (noise_power * 10.0 ** (snr_db / 10.0))))
     return (speech + scale * noise).astype(np.float32), scale
-
-
-# --- configuration and the pipeline --------------------------------------
 
 
 @dataclass
@@ -304,7 +243,6 @@ class Augmenter:
         out = np.asarray(audio, dtype=np.float32).copy()
         mask = speech_mask_samples(labels, len(out))
 
-        # 1. the talker in the room
         if rng.random() < self.config.reverb_prob:
             impulse, direct_path, rir_id = self.target_bank.sample(rng)
             wet = apply_rir(out, impulse, direct_path)
@@ -313,7 +251,6 @@ class Augmenter:
             out = wet
             record.reverb, record.rir_id = True, rir_id
 
-        # 2. the interferer arriving at the microphone
         if rng.random() < self.config.noise_prob:
             path = self.musan[int(rng.integers(0, len(self.musan)))]
             noise = fit_noise(_read_musan(str(path)), len(out), rng)
@@ -330,17 +267,9 @@ class Augmenter:
         return out, record
 
 
-# --- dataset wrapper ------------------------------------------------------
-
-
 def features_from_audio(audio: np.ndarray, n_frames: int,
                         config: DataConfig, stats) -> np.ndarray:
-    """The committed front-end applied to an already-augmented waveform.
-
-    The same three calls `data.clip_features` makes, with the audio injected
-    rather than read from disk: high-pass, log-mel, then normalize with the
-    saved training statistics.
-    """
+    """The front-end applied to an already-augmented waveform."""
     conditioned = highpass(audio, config.sample_rate, config.highpass_hz,
                            config.highpass_order)
     mel = logmel(conditioned, sr=config.sample_rate, n_mels=config.n_mels,
@@ -352,23 +281,16 @@ def features_from_audio(audio: np.ndarray, n_frames: int,
 class AugmentedDataset:
     """Wraps a VADDataset, augmenting the waveform before the front-end.
 
-    Labels come straight from the clean source timestamps and are returned
-    unchanged, which is the whole reason the operations were defined to be
-    boundary-preserving.
-
-    `epoch` seeds the per-item generator alongside the item index, so every
-    epoch sees different rooms and noise while a given (seed, epoch, index)
-    always reproduces the same draw.
+    (seed, epoch, index) reproduces a draw exactly. Labels come from the clean
+    source timestamps and are returned unchanged.
     """
 
     def __init__(self, base, augmenter: Augmenter, config: DataConfig,
-                 epoch: int = 0, deterministic: bool = False):
+                 epoch: int = 0):
         self.base = base
         self.augmenter = augmenter
         self.config = config
         self.epoch = epoch
-        self.deterministic = deterministic
-        self.records: dict[str, AugmentRecord] = {}
 
     def __len__(self) -> int:
         return len(self.base)
@@ -377,8 +299,8 @@ class AugmentedDataset:
         self.epoch = epoch
 
     def _rng(self, index: int) -> np.random.Generator:
-        seed = [self.augmenter.config.seed, 0 if self.deterministic else self.epoch, index]
-        return np.random.default_rng(seed)
+        return np.random.default_rng(
+            [self.augmenter.config.seed, self.epoch, index])
 
     def __getitem__(self, index: int) -> dict:
         import torch
@@ -391,8 +313,7 @@ class AugmentedDataset:
                              bridge_gap_s=self.config.bridge_gap_s)[self.base.convention]
 
         audio = read_audio(clip, target_sr=self.config.sample_rate)
-        augmented, record = self.augmenter(audio, labels, self._rng(index))
-        self.records[stem] = record
+        augmented, _ = self.augmenter(audio, labels, self._rng(index))
 
         n_frames = n_frames_for(clip.duration_s, self.config.fps)
         features = features_from_audio(augmented, n_frames, self.config,
@@ -407,11 +328,9 @@ class AugmentedDataset:
 
 def augmented_audio(clip, labels: np.ndarray, augmenter: Augmenter,
                     config: DataConfig, index: int) -> tuple[np.ndarray, AugmentRecord]:
-    """Deterministic augmented waveform for one clip, for fixed test conditions.
+    """Deterministic augmented waveform, for fixed test conditions.
 
-    Seeded by the augmenter's seed and the clip index only, with no epoch term,
-    so a condition is the same every time it is built and every system is
-    scored on identical audio.
+    Seeded by (seed, index) with no epoch term, so a condition is reproducible.
     """
     audio = read_audio(clip, target_sr=config.sample_rate)
     rng = np.random.default_rng([augmenter.config.seed, index])

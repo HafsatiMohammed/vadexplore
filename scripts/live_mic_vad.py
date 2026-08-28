@@ -1,22 +1,8 @@
-"""Real-time microphone VAD with a scrolling display.
-
-Runs the trained streaming causal model on live audio through the exact
-training front-end and the streaming inference path. Nothing is reimplemented:
-the high-pass, the log-mel, the feature statistics, the model, and the
-frame-by-frame session are the same objects the offline evaluation uses.
-
-Threading. The sounddevice callback does one thing: copy the block into a
-queue and return. It never touches the model, the feature stack, or
-matplotlib. A consumer driven by FuncAnimation drains the queue, advances the
-front-end and the model, and redraws. Doing feature work inside the audio
-callback is how you get dropouts, and doing matplotlib work there is how you
-get a crash.
+"""Real-time microphone VAD with a scrolling display. Needs a causal_attn run.
 
     python scripts/live_mic_vad.py
     python scripts/live_mic_vad.py --run runs/<name> --window-seconds 8
-    python scripts/live_mic_vad.py --input-wav clip.wav --no-plot   # verification
-
-sounddevice, numpy, matplotlib.
+    python scripts/live_mic_vad.py --input-wav clip.wav --no-plot
 """
 
 from __future__ import annotations
@@ -36,7 +22,6 @@ import torch
 from vadexplore.config import DataConfig
 from vadexplore.data import load_feature_stats
 from vadexplore.features import logmel
-from vadexplore.labels import DEFAULT_FPS
 from vadexplore.model import StreamingVADSession
 from vadexplore.preprocess import highpass
 from vadexplore.train import load_checkpoint, resolve_device
@@ -62,26 +47,11 @@ def _resolve(path) -> Path:
     return Path(os.path.expanduser(str(path)))
 
 
-# --- causal post-processing ----------------------------------------------
-
-
 class CausalPostprocessor:
-    """Streaming-safe subset of the offline post-processing.
+    """The streaming-safe subset of the offline post-processing.
 
-    Trailing median smoothing looks only at past frames, so it adds no latency,
-    but it is not the same operator as the centered median used offline: a
-    trailing window reacts to a transition one half-window late. That is the
-    price of causality and it is declared rather than hidden.
-
-    Hangover is naturally causal. It fires after an offset is observed and
-    extends forward, so it needs no future frames and adds no latency. The
-    post-processing sweep chose hangover alone as the best setting, which is
-    convenient: the operation that helped most is the one that streams for
-    free.
-
-    Minimum speech duration is deliberately not implemented here. Deciding that
-    a segment is long enough requires waiting for it to end, which is a delay
-    of the full minimum duration. It stays an offline-only operation.
+    Trailing median, which reacts one half-window late, and hangover. Minimum
+    speech duration is offline-only: it would cost its full duration in latency.
     """
 
     def __init__(self, threshold: float, smooth_frames: int = 1,
@@ -107,9 +77,6 @@ class CausalPostprocessor:
             self._countdown -= 1
             return smoothed, True
         return smoothed, False
-
-
-# --- the consumer ---------------------------------------------------------
 
 
 class LiveVAD:
@@ -142,8 +109,6 @@ class LiveVAD:
         self.decisions: dict[int, bool] = {}
         self.smoothed: dict[int, float] = {}
 
-    # --- the front-end, matching training exactly ---
-
     def _finalizable_frames(self) -> int:
         """How many frames have enough filtered audio behind and ahead of them."""
         available = self._raw_offset + len(self._raw)
@@ -155,14 +120,8 @@ class LiveVAD:
     def _features(self, first: int, last: int) -> np.ndarray:
         """Normalized log-mel for absolute frames [first, last).
 
-        The signal is filtered over a window with `margin` on both sides and
-        only the interior is used, so each frame sees the same filtered samples
-        the offline path would have produced for it.
-
-        Normalization uses the SAVED TRAINING STATISTICS. Computing mean and
-        variance from the live audio instead would silently rescale the input
-        the model was trained on, and the failure is quiet: the model keeps
-        producing plausible-looking probabilities that are simply wrong.
+        Normalization uses the saved training statistics; computing them from live
+        audio fails quietly, producing plausible probabilities that are wrong.
         """
         start = first * self.hop
         stop = (last - 1) * self.hop + self.win
@@ -212,9 +171,6 @@ class LiveVAD:
         return self._next_frame
 
 
-# --- latency accounting ---------------------------------------------------
-
-
 def latency_report(block_ms: float, lookahead_frames: int, fps: int,
                    filter_margin_ms: float, hangover_frames: int,
                    smooth_frames: int) -> dict:
@@ -236,9 +192,6 @@ def latency_report(block_ms: float, lookahead_frames: int, fps: int,
                  "latency; minimum speech duration would cost its full duration "
                  "and is left offline"),
     }
-
-
-# --- display --------------------------------------------------------------
 
 
 def build_display(live: LiveVAD, window_seconds: float, threshold: float,
@@ -330,9 +283,6 @@ def build_display(live: LiveVAD, window_seconds: float, threshold: float,
     animation = FuncAnimation(fig, update, interval=redraw_ms,
                               blit=False, cache_frame_data=False)
     return fig, animation
-
-
-# --- main -----------------------------------------------------------------
 
 
 def load_threshold(run_dir: Path, target_fa: float, fallback: float = 0.5) -> tuple:

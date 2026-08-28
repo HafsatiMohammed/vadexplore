@@ -1,23 +1,13 @@
-"""Sweep VAD post-processing on a trained model's posteriors.
-
-No retraining. Posteriors come from the existing evaluation code, and the
-threshold stays at the value validation chose for the false-alarm budget, held
-fixed throughout. Every gain reported here is therefore attributable to the
-post-processing and not to moving the operating point underneath it.
-
-Settings are selected on validation segment F1 and reported on test.
+"""Sweep post-processing on a trained model's posteriors. No retraining, and
+the threshold stays where validation put it. Settings picked on val, reported on test.
 
     python scripts/postproc_sweep.py --run runs/<name>
-
-numpy, plus the existing evaluation and plotting code.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
-from pathlib import Path
 
 import matplotlib
 
@@ -33,7 +23,6 @@ from vadexplore.evaluate import (
     _resolve,
     collect_predictions,
     match_segments,
-    score_at_threshold,
     threshold_for_fa_budget,
 )
 from vadexplore.labels import make_labels, segments_from_frames
@@ -152,11 +141,9 @@ def main(argv=None) -> int:
         "order": "smooth posterior, threshold, min speech duration, hangover",
     }
 
-    # --- (a) raw baseline ---
     report["baseline"] = {"val": score(validation, threshold, raw, args.collar_s),
                           "test": score(evaluation, threshold, raw, args.collar_s)}
 
-    # --- (b) each operation alone, best setting chosen on val ---
     ablations = {}
     for name, grid in (("smooth", SMOOTH_GRID_MS),
                        ("min_speech", MIN_SPEECH_GRID_MS),
@@ -186,7 +173,6 @@ def main(argv=None) -> int:
         }
     report["ablations"] = ablations
 
-    # --- (c) the full grid ---
     combinations = []
     for method in METHODS:
         for smooth_ms in SMOOTH_GRID_MS:
@@ -216,7 +202,6 @@ def main(argv=None) -> int:
                                              key=lambda p: -p[0]["segment_f1"])[:10]],
     }
 
-    # --- figures on representative clips ---
     directory = _resolve(split_data["dataset_dir"])
     gains = []
     for i, (probs, labels) in enumerate(zip(evaluation.per_clip_scores,
@@ -274,16 +259,14 @@ def main(argv=None) -> int:
     report["figures"] = figures
     (out_dir / "results.json").write_text(json.dumps(report, indent=2))
 
-    # --- table ---
     rows = [("raw threshold (baseline)", report["baseline"])]
     for name in ("smooth", "min_speech", "hangover"):
         rows.append((f"+ {name} only ({ablations[name]['label']})", ablations[name]))
     rows.append((f"full pipeline ({report['grid']['best_label']})", report["grid"]))
 
-    print(f"\n{'=' * 96}")
+    print()
     print(f"POST-PROCESSING on {args.split}   (settings selected on val segment F1, "
           f"threshold fixed at {threshold:.4f})")
-    print("=" * 96)
     print(f"  {'setting':<40} {'segF1':>7} {'segP':>7} {'segR':>7} "
           f"{'#hyp':>6} {'frameF1':>8} {'FRR%':>7}")
     baseline_f1 = report["baseline"]["test"]["segment_f1"]

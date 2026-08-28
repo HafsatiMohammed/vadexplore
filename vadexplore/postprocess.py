@@ -1,25 +1,4 @@
-"""Standard VAD post-processing on frame-level speech posteriors.
-
-Three composable operations, applied in one fixed order:
-
-    smooth the posterior  ->  threshold  ->  min speech duration  ->  hangover
-
-The order is not arbitrary. Smoothing acts on the continuous score, where it
-can suppress a spike without committing to a decision. Duration filtering has
-to come after thresholding, since a duration only exists once there are
-segments. Hangover comes last so it extends the segments that survived, rather
-than extending spurious bursts that the duration filter is about to delete.
-
-The threshold stays at whatever value validation chose. Post-processing is
-scored against the same operating point as the raw baseline, so any gain is
-attributable to the operations and not to re-tuning the threshold underneath
-them.
-
-Parameters are in milliseconds. Conversion to frames happens here, once,
-against the fixed 100 fps grid.
-
-numpy only, plus the canonical segment conversion from `vadexplore.labels`.
-"""
+"""Post-processing, in one fixed order: smooth, threshold, min speech duration, hangover."""
 
 from __future__ import annotations
 
@@ -33,12 +12,9 @@ SMOOTHING_METHODS = ("median", "moving_average", "none")
 
 
 def window_frames(window_ms: float, fps: int = DEFAULT_FPS) -> int:
-    """Milliseconds to an odd, centered window length in frames.
+    """Milliseconds to an odd, centred window length in frames.
 
-    Rounded up to odd so the window is symmetric about the frame it is
-    smoothing. An even window would shift every value half a frame, which is
-    exactly the kind of small systematic boundary bias this whole project has
-    been careful to avoid.
+    Odd so the window is symmetric; an even one shifts every value half a frame.
     """
     n = max(1, int(round(float(window_ms) * fps / 1000.0)))
     return n if n % 2 else n + 1
@@ -49,20 +25,12 @@ def duration_frames(duration_ms: float, fps: int = DEFAULT_FPS) -> int:
     return max(0, int(round(float(duration_ms) * fps / 1000.0)))
 
 
-# --- the three operations -------------------------------------------------
-
-
 def smooth(probs: np.ndarray, method: str = "median", window_ms: float = 0.0,
            fps: int = DEFAULT_FPS) -> np.ndarray:
     """Smooth a posterior before it is thresholded.
 
-    `median` removes an isolated spike outright while leaving a real transition
-    where it was, because a step edge is a fixed point of the median. A moving
-    average instead spreads the spike over the window and rounds off the edge,
-    which shifts the crossing point. Both are offered so the sweep can show the
-    difference rather than assert it.
-
-    A window of one frame, or `method="none"`, is the identity.
+    A step edge is a fixed point of the median, so "median" kills a spike and
+    leaves transitions put; "moving_average" rounds the edge and moves the crossing.
     """
     if method not in SMOOTHING_METHODS:
         raise ValueError(f"method must be one of {SMOOTHING_METHODS}, got {method!r}")
@@ -90,13 +58,7 @@ def smooth(probs: np.ndarray, method: str = "median", window_ms: float = 0.0,
 
 def min_speech_duration(decisions: np.ndarray, min_ms: float = 0.0,
                         fps: int = DEFAULT_FPS) -> np.ndarray:
-    """Delete speech segments shorter than `min_ms`.
-
-    A 10 or 20 ms burst of speech is not something a listener registers, and
-    downstream it shows up as a spurious trigger. Measured earlier on this
-    corpus, about half of all false-positive runs at threshold 0.5 were three
-    frames or shorter, so this is the operation with the most to remove.
-    """
+    """Delete speech segments shorter than min_ms."""
     frames = np.asarray(decisions).astype(bool).copy()
     minimum = duration_frames(min_ms, fps)
     if minimum <= 1 or frames.size == 0:
@@ -111,16 +73,9 @@ def min_speech_duration(decisions: np.ndarray, min_ms: float = 0.0,
 
 def hangover(decisions: np.ndarray, hang_ms: float = 0.0,
              fps: int = DEFAULT_FPS) -> np.ndarray:
-    """Extend every speech segment by `hang_ms` past its offset.
+    """Extend every speech segment by hang_ms past its offset.
 
-    The classic VAD hangover. It does two things at once: it stops the quiet
-    tail of a word being clipped, since energy decays below the threshold
-    before the word is actually over, and it bridges brief dips inside
-    continuous speech by letting one segment run into the next.
-
-    Extension is computed from the segments as they were on entry, so a
-    segment extended into another does not then extend again from the new
-    offset and cascade.
+    Extensions come from the segments as they were on entry, so they do not cascade.
     """
     frames = np.asarray(decisions).astype(bool).copy()
     extension = duration_frames(hang_ms, fps)
@@ -131,9 +86,6 @@ def hangover(decisions: np.ndarray, hang_ms: float = 0.0,
         hi = int(round(end * fps))
         frames[hi:min(hi + extension, len(frames))] = True
     return frames
-
-
-# --- the pipeline ---------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -170,9 +122,7 @@ def apply_pipeline(probs: np.ndarray, threshold: float,
                    fps: int = DEFAULT_FPS) -> np.ndarray:
     """Posterior to final decisions, in the fixed order.
 
-    `threshold` is the validation-chosen operating point and is never adjusted
-    here, so a comparison against the raw baseline isolates the effect of the
-    operations.
+    threshold is never adjusted here, so a comparison against raw isolates the ops.
     """
     values = np.asarray(probs, dtype=np.float64)
     smoothed = smooth(values, config.smooth_method, config.smooth_ms, fps)

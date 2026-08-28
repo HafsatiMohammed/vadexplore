@@ -1,0 +1,105 @@
+
+corpus
+  clips 957   hours 3.28   speakers 34   chapters 79
+  duration  min 1.41s  median 13.88s  max 17.20s  mean 12.33s
+  clips/speaker   min 8  median 29  max 41
+  minutes/speaker min 1.1  median 5.8  max 8.5
+
+  speaker  clips  minutes  chapters
+     1455     41      8.5         2
+     1594     41      8.2         1
+      118     38      7.4         3
+      125     34      5.9         2
+     1624     34      7.3         2
+     1081     33      6.7         2
+     1502     33      5.8         2
+     1246     32      6.5         3
+     1578     32      7.0         3
+     1743     32      6.6         3
+     1447     31      5.8         4
+      163     31      7.2         2
+     1098     30      5.5         1
+      150     30      6.5         3
+     1040     29      5.7         1
+     1088     29      6.9         3
+     1737     29      6.1         4
+       19     29      6.6         2
+     1867     28      5.7         3
+     1898     27      4.7         4
+     1235     26      5.1         3
+     1553     26      6.0         2
+     1723     26      5.9         1
+     1034     25      4.5         1
+     1363     25      5.1         2
+     1841     25      5.8         3
+     1263     24      5.7         3
+     1334     24      5.7         1
+     1355     23      5.4         1
+     1069     22      4.9         2
+      103     20      4.7         2
+     1116     20      3.8         3
+     1183     20      2.6         4
+     1926      8      1.1         1
+
+proposed speaker-disjoint split
+  train 22 speakers   673 clips (70.3%)  2.31 h
+        103, 1040, 1081, 1088, 1098, 1116, 118, 1246, 125, 1334, 1363, 1447, 1455, 150, 1502, 1553, 1578, 1594, 1624, 163, 1743, 1867
+  val    6 speakers   148 clips (15.5%)  0.48 h
+        1034, 1069, 1183, 1737, 1841, 1898
+  test   6 speakers   136 clips (14.2%)  0.50 h
+        1235, 1263, 1355, 1723, 19, 1926
+
+class balance
+  literal  speech 80.7% of all frames (4.17 : 1 speech to non-speech)
+  bridged  speech 82.3% of all frames (4.66 : 1)
+
+segments and gaps
+  segments 9740  median length 820 ms  mean 10.2 per clip
+  gaps     8783  median 30 ms  p95 870 ms
+  elbow 100 ms, plateau 51 gaps per 10 ms bucket
+
+   threshold   gaps bridged   seg/clip  speech frac    delta
+       100ms          66.0%        4.2        81.8%    +1.1%
+       150ms          68.5%        3.9        82.0%    +1.4%
+       200ms          70.8%        3.7        82.3%    +1.7%
+       300ms          77.5%        3.1        83.5%    +2.9%
+
+snr
+  measured on 957 clips, 0 skipped (no silence frames)
+  min 0.2  p05 3.5  median 19.3  p95 28.7  max 41.5 dB
+
+  effect of the 80 Hz high-pass on SNR
+    median 19.3 -> 21.4 dB
+    clips below the 13 dB gate: 176 -> 80
+    mean gain: high-rumble clips +14.0 dB, the rest +1.6 dB
+    corr(sub-80 Hz share in silence, SNR) = -0.32
+
+low-frequency rumble, below 80 Hz
+  whole clip      median 0.0066  max 0.9418
+  labeled silence median 0.1545  max 0.9991
+
+  top clips by sub-80 Hz energy share in silence
+    1363-135842-0022     speaker  1363  silence 0.999  whole 0.891
+    1363-135842-0008     speaker  1363  silence 0.999  whole 0.850
+    1363-135842-0050     speaker  1363  silence 0.999  whole 0.894
+    1363-135842-0037     speaker  1363  silence 0.998  whole 0.890
+    1363-135842-0025     speaker  1363  silence 0.998  whole 0.882
+    1363-135842-0034     speaker  1363  silence 0.998  whole 0.927
+
+position
+  P(speech)  first decile 69.2%   middle 83.2%   last decile 69.1%
+
+proposed thresholds
+  1. bridging gap   100 ms   closes 66.0% of gaps, speech 81.8%, 4.2 seg/clip
+  2. SNR gate       13 dB   781 clean (augmentable) / 176 degraded (use raw)
+  3. rumble gate    0.75 sub-80 Hz share in silence   96 clips above
+     80 Hz high-pass takes the worst clip from 99.9% to 44.9% sub-80 Hz energy in silence
+explore_out/corpus_stats.json
+explore_out/figures/class_balance.png
+explore_out/figures/durations.png
+explore_out/figures/position.png
+explore_out/figures/rumble.png
+explore_out/figures/rumble_highpass.png
+explore_out/figures/segments_and_gaps.png
+explore_out/figures/snr.png
+explore_out/figures/speakers.png

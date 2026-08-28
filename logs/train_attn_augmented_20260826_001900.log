@@ -1,0 +1,43 @@
+run attn_augmented  core causal_attn  label bridged
+  device mps: Apple Silicon, arm64
+  362,497 parameters, 673 train clips, 148 val clips
+  pos_weight 0.2326 (inverse_freq), selecting on frr_at_fa (lower is better)
+  first epoch took 53.0s (train 50.6s, val 2.4s); estimated total for 30 epochs 26m 30.1s
+  epoch   1  train 0.1252  val 0.0726  eer  5.89%  auc 0.9838  frr@fa 20.43%  (92.4 fa/h)  50.6s+2.4s  *
+  epoch   2  train 0.0914  val 0.0542  eer  4.66%  auc 0.9877  frr@fa 13.34%  (96.6 fa/h)  50.2s+1.6s  *
+  epoch   3  train 0.0899  val 0.0519  eer  5.01%  auc 0.9862  frr@fa 19.22%  (92.4 fa/h)  51.7s+1.8s
+  epoch   4  train 0.0823  val 0.0489  eer  4.29%  auc 0.9882  frr@fa 14.50%  (94.5 fa/h)  52.7s+2.6s
+  epoch   5  train 0.0794  val 0.0480  eer  4.06%  auc 0.9891  frr@fa 13.30%  (86.1 fa/h)  59.7s+2.9s  *
+  epoch   6  train 0.0768  val 0.0463  eer  4.21%  auc 0.9891  frr@fa 13.32%  (96.6 fa/h)  75.4s+2.1s
+  epoch   7  train 0.0749  val 0.0460  eer  4.59%  auc 0.9885  frr@fa 15.69%  (94.5 fa/h)  64.4s+1.2s
+  epoch   8  train 0.0716  val 0.0422  eer  3.99%  auc 0.9896  frr@fa 10.95%  (96.6 fa/h)  46.2s+1.1s  *
+  epoch   9  train 0.0682  val 0.0458  eer  4.30%  auc 0.9887  frr@fa 12.16%  (96.6 fa/h)  46.0s+1.1s
+  epoch  10  train 0.0753  val 0.0449  eer  4.21%  auc 0.9885  frr@fa  9.79%  (90.3 fa/h)  46.0s+1.1s  *
+  epoch  11  train 0.0667  val 0.0447  eer  4.12%  auc 0.9893  frr@fa 12.13%  (94.5 fa/h)  45.6s+1.1s
+  epoch  12  train 0.0622  val 0.0438  eer  3.98%  auc 0.9888  frr@fa 12.13%  (98.7 fa/h)  46.0s+1.1s
+  epoch  13  train 0.0671  val 0.0388  eer  3.70%  auc 0.9903  frr@fa  8.58%  (92.4 fa/h)  45.5s+1.1s  *
+  epoch  14  train 0.0609  val 0.0407  eer  3.78%  auc 0.9894  frr@fa  9.78%  (86.1 fa/h)  45.4s+1.1s
+  epoch  15  train 0.0661  val 0.0439  eer  4.19%  auc 0.9883  frr@fa 16.87%  (96.6 fa/h)  45.2s+1.1s
+  epoch  16  train 0.0622  val 0.0437  eer  4.21%  auc 0.9892  frr@fa 13.31%  (96.6 fa/h)  46.6s+1.1s
+  epoch  17  train 0.0614  val 0.0407  eer  3.86%  auc 0.9903  frr@fa  9.75%  (92.4 fa/h)  45.9s+1.1s
+  epoch  18  train 0.0593  val 0.0398  eer  3.82%  auc 0.9900  frr@fa  8.63%  (98.7 fa/h)  45.3s+1.1s
+  epoch  19  train 0.0567  val 0.0381  eer  3.44%  auc 0.9904  frr@fa  8.56%  (88.2 fa/h)  44.5s+1.1s  *
+  epoch  20  train 0.0580  val 0.0397  eer  3.73%  auc 0.9902  frr@fa  7.45%  (98.7 fa/h)  45.0s+1.1s  *
+  epoch  21  train 0.0553  val 0.0392  eer  3.66%  auc 0.9900  frr@fa  8.61%  (90.3 fa/h)  45.8s+1.1s
+  epoch  22  train 0.0561  val 0.0408  eer  3.91%  auc 0.9892  frr@fa 12.13%  (96.6 fa/h)  46.7s+1.1s
+  epoch  23  train 0.0518  val 0.0404  eer  3.72%  auc 0.9902  frr@fa  8.58%  (90.3 fa/h)  44.8s+1.1s
+  epoch  24  train 0.0519  val 0.0402  eer  3.86%  auc 0.9900  frr@fa 10.95%  (88.2 fa/h)  45.9s+1.1s
+  epoch  25  train 0.0514  val 0.0406  eer  3.87%  auc 0.9898  frr@fa 10.93%  (86.1 fa/h)  46.3s+1.1s
+  epoch  26  train 0.0524  val 0.0411  eer  3.84%  auc 0.9897  frr@fa  9.77%  (90.3 fa/h)  44.3s+1.1s
+  epoch  27  train 0.0490  val 0.0407  eer  3.82%  auc 0.9896  frr@fa  9.78%  (94.5 fa/h)  45.0s+1.1s
+  epoch  28  train 0.0529  val 0.0406  eer  3.82%  auc 0.9896  frr@fa  9.79%  (96.6 fa/h)  45.2s+1.1s
+  early stop: no improvement in frr_at_fa for 8 epochs
+  best frr_at_fa 0.0745 at epoch 20
+  checkpoint runs/attn_augmented/best.pt
+
+  timing on mps: Apple Silicon, arm64
+    total          23m 19.3s over 28 epochs
+    train          22m 41.8s (48.6s per epoch, 13.8 clips/s, 17,068 frames/s)
+    validation     37.2s (1.3s per epoch, 111.5 clips/s, 129,130 frames/s)
+    other          0.3s (setup, feature caching, checkpoint writes)
+    timing written to runs/attn_augmented/timing.json

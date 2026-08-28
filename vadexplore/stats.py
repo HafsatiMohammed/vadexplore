@@ -1,12 +1,4 @@
-"""Corpus-level analysis for the VAD dataset.
-
-Pure computation. Everything returns plain Python or numpy so it can be
-serialized to JSON or handed to a plotting layer. No matplotlib here, so the
-numbers can be recomputed in a training job without a display stack.
-
-Reuses the loader, the label geometry in `vadexplore.labels`, and the feature
-functions in `vadexplore.features` rather than reframing audio locally.
-"""
+"""Corpus-level analysis. Returns plain Python or numpy; no matplotlib."""
 
 from __future__ import annotations
 
@@ -34,9 +26,6 @@ from vadexplore.loader import read_audio
 BRIDGE_CANDIDATES_S = (0.10, 0.15, 0.20, 0.30)
 RUMBLE_HZ = 80.0
 POSITION_BINS = 100
-
-
-# --- small helpers --------------------------------------------------------
 
 
 def describe(values, unit: str = "") -> dict:
@@ -72,16 +61,10 @@ def histogram(values, bins=30, range_=None) -> dict:
 def gaps_between(segments) -> list[float]:
     """Non-speech gaps strictly between consecutive speech segments.
 
-    Leading silence before the first segment and trailing silence after the
-    last are excluded on purpose: they are not candidates for bridging, and
-    including them would put a long tail into the histogram that no threshold
-    would ever act on.
+    Leading and trailing silence are excluded; they are not bridging candidates.
     """
     normalized = normalize_segments(segments)
     return [normalized[i + 1][0] - normalized[i][1] for i in range(len(normalized) - 1)]
-
-
-# --- per-clip pass --------------------------------------------------------
 
 
 def _snr_db(energy: np.ndarray, speech: np.ndarray, silence: np.ndarray):
@@ -96,11 +79,7 @@ def _snr_db(energy: np.ndarray, speech: np.ndarray, silence: np.ndarray):
 
 def analyze_clip(clip, fps: int = DEFAULT_FPS, bridge_gap_s: float = 0.2,
                  highpass_hz: float = HIGHPASS_HZ) -> dict:
-    """Everything measurable from one clip, labels and audio together.
-
-    SNR and the rumble measures need labeled frames to split speech from
-    silence, so they are computed here where both are already in hand.
-    """
+    """Everything measurable from one clip, labels and audio together."""
     labels = make_labels(clip, fps=fps, bridge_gap_s=bridge_gap_s)
     n_frames = labels["n_frames"]
     literal = labels["literal"].astype(bool)
@@ -151,7 +130,6 @@ def analyze_clip(clip, fps: int = DEFAULT_FPS, bridge_gap_s: float = 0.2,
     )
     row["silence_frames"] = int(silence.sum())
 
-    # speech probability against normalized position, one row per clip
     row["position_curve"] = _position_curve(literal, POSITION_BINS).tolist()
 
     return row
@@ -160,24 +138,13 @@ def analyze_clip(clip, fps: int = DEFAULT_FPS, bridge_gap_s: float = 0.2,
 def _position_curve(literal: np.ndarray, n_bins: int) -> np.ndarray:
     """Resample a clip's frame labels onto a fixed 0 to 1 position grid.
 
-    Every clip contributes the same number of points regardless of length, so
-    the corpus average is not dominated by the long clips.
+    Every clip contributes the same number of points regardless of length.
     """
     if literal.size == 0:
         return np.zeros(n_bins)
     src = (np.arange(literal.size) + 0.5) / literal.size
     dst = (np.arange(n_bins) + 0.5) / n_bins
     return np.interp(dst, src, literal.astype(np.float64))
-
-
-def analyze_corpus(clips, fps: int = DEFAULT_FPS, bridge_gap_s: float = 0.2,
-                   highpass_hz: float = HIGHPASS_HZ) -> list[dict]:
-    """Run `analyze_clip` over every clip."""
-    return [analyze_clip(c, fps=fps, bridge_gap_s=bridge_gap_s,
-                         highpass_hz=highpass_hz) for c in clips]
-
-
-# --- aggregation ----------------------------------------------------------
 
 
 def speaker_table(rows) -> dict:
@@ -200,13 +167,10 @@ def speaker_table(rows) -> dict:
 
 
 def propose_split(table: dict, val_frac: float = 0.15, test_frac: float = 0.15) -> dict:
-    """Speaker-disjoint train/val/test proposal.
+    """Speaker-disjoint train/val/test proposal, greedy largest-first.
 
-    Greedy largest-first assignment: walk speakers from most clips to fewest
-    and give each to whichever partition is furthest below its target share.
-    Speaker-disjoint splits cannot hit an exact ratio, since a speaker is
-    indivisible, and largest-first keeps the error bounded by the largest
-    remaining speaker rather than letting it accumulate.
+    A speaker is indivisible so the ratio is never exact; largest-first bounds the
+    error by the largest remaining speaker.
     """
     targets = {"train": 1.0 - val_frac - test_frac, "val": val_frac, "test": test_frac}
     total_clips = sum(table["clips"].values())
@@ -235,12 +199,7 @@ def propose_split(table: dict, val_frac: float = 0.15, test_frac: float = 0.15) 
 
 
 def bridging_analysis(clips, rows, candidates=BRIDGE_CANDIDATES_S, fps: int = DEFAULT_FPS) -> list[dict]:
-    """What each candidate bridging threshold would actually do.
-
-    Reports the share of gaps it closes, the resulting segment count per clip,
-    and the overall speech fraction, so the choice is made on consequences
-    rather than on the shape of the gap histogram alone.
-    """
+    """Gaps closed, segments per clip, and speech fraction for each candidate threshold."""
     all_gaps = np.array([g for row in rows for g in row["gaps_s"]], dtype=np.float64)
     total_frames = sum(row["n_frames"] for row in rows)
     literal_speech = sum(row["speech_frames_literal"] for row in rows)
@@ -266,16 +225,10 @@ def bridging_analysis(clips, rows, candidates=BRIDGE_CANDIDATES_S, fps: int = DE
 
 
 def propose_snr_gate(snr_values, percentile: float = 20.0) -> dict:
-    """Pick an SNR threshold separating clean from already-degraded clips.
+    """SNR threshold separating clean from already-degraded clips.
 
-    The gate protects a controlled-degradation setup. Convolving an already
-    noisy clip with a room impulse response reverberates its noise floor along
-    with the speech, so the resulting sample is not "clean speech in room X"
-    and the augmentation stops being a controlled variable. Degraded clips are
-    kept raw instead.
-
-    The threshold is data driven: a round number near the chosen low
-    percentile, so the cut sits under the main mode rather than through it.
+    Reverberating an already noisy clip reverberates its noise floor too, so the
+    augmentation stops being controlled. A round number near the low percentile.
     """
     arr = np.asarray(list(snr_values), dtype=np.float64)
     if arr.size == 0:
@@ -328,17 +281,10 @@ def position_profile(rows) -> dict:
 
 def gap_elbow(gaps, bucket_ms: float = 10.0, floor_lo_ms: float = 200.0,
               floor_hi_ms: float = 400.0, factor: float = 1.5) -> dict:
-    """Locate where the short-gap cluster meets the genuine-pause floor.
+    """Find where the short-gap cluster meets the genuine-pause floor.
 
-    The gap distribution has two regimes. Below roughly 100 ms the counts fall
-    off steeply: those are aligner artifacts and within-word closures. Above
-    it the counts flatten into a broad plateau of real pauses that is roughly
-    uniform out to a second or more.
-
-    The elbow is the first bucket whose count comes within `factor` times the
-    plateau level, measured as the median count between `floor_lo_ms` and
-    `floor_hi_ms`. Bridging up to the elbow removes the artifact cluster.
-    Bridging past it starts deleting genuine pauses at the plateau rate.
+    The first bucket within factor times the plateau level, the plateau being the
+    median count between floor_lo_ms and floor_hi_ms.
     """
     arr = np.asarray(list(gaps), dtype=np.float64) * 1000.0
     if arr.size == 0:

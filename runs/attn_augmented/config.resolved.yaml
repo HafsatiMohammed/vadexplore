@@ -1,6 +1,6 @@
 name: attn_augmented
 seed: 0
-device: auto
+device: mps
 progress: auto
 out_root: runs
 data:

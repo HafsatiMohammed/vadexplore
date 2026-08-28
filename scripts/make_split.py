@@ -1,11 +1,5 @@
-"""Freeze the speaker-disjoint train/val/test split into splits/split.json.
-
-The split is keyed by speaker: every clip of a speaker lands in one partition,
-so no evaluation number can be inflated by speaker memorization.
-
-This file is committed and read by every experiment. Regenerating it changes
-what train and test mean, so the script refuses to overwrite an existing split
-unless --force is given.
+"""Freeze the speaker-disjoint split into splits/split.json.
+Refuses to overwrite an existing split without --force.
 
     python scripts/make_split.py [dataset_dir] [--stats explore_out/corpus_stats.json]
                                  [--out splits/split.json] [--seed 0] [--force]
@@ -32,11 +26,8 @@ PARTITIONS = ("train", "val", "test")
 def derive_split(clips_per_speaker: dict, val_frac: float, test_frac: float, seed: int) -> dict:
     """Greedy largest-first speaker assignment, deterministic given the seed.
 
-    A speaker is indivisible, so an exact ratio is unreachable. Walking from
-    the most clips to the fewest and giving each speaker to whichever
-    partition is furthest below target bounds the error by the largest
-    remaining speaker instead of letting it accumulate. The seed only breaks
-    ties between speakers with identical clip counts, so the result is stable.
+    A speaker is indivisible so the ratio is never exact. The seed only breaks
+    ties between equal clip counts.
     """
     rng = random.Random(seed)
     targets = {"train": 1.0 - val_frac - test_frac, "val": val_frac, "test": test_frac}
@@ -150,7 +141,6 @@ def main() -> int:
         v = payload["partitions"][partition]
         print(f"  {partition:<10} {v['n_speakers']:9d} {v['n_clips']:7d} "
               f"{v['clip_fraction'] * 100:7.1f}% {v['hours']:7.2f}")
-    print("\n  speaker disjointness asserted: no speaker id appears in more than one partition")
     return 0
 
 

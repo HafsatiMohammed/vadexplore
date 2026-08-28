@@ -1,13 +1,4 @@
-"""Training data layer: split-aware dataset, normalization, and collation.
-
-Everything is built on the existing pieces. Audio comes from
-`loader.read_audio`, conditioning from `preprocess.highpass`, features from
-`features.logmel`, and labels from `labels.make_labels`. Nothing here
-reimplements a spectrogram or a rasterizer.
-
-The frame grid is fixed project-wide: 16 kHz, 10 ms hop, 25 ms window, 40
-log-mel bins, 100 frames per second.
-"""
+"""Split-aware dataset, feature normalization, and collation."""
 
 from __future__ import annotations
 
@@ -38,10 +29,7 @@ def load_split(path=DEFAULT_SPLIT) -> dict:
     """Read the frozen split, failing clearly if it has not been made yet."""
     path = _resolve(path)
     if not path.exists():
-        raise FileNotFoundError(
-            f"no frozen split at {path}\n"
-            "  create it once with: python scripts/make_split.py"
-        )
+        raise FileNotFoundError(f"no frozen split at {path}")
     return json.loads(path.read_text())
 
 
@@ -52,15 +40,8 @@ def partition_stems(split: dict, partition: str) -> list[str]:
     return list(split["partitions"][partition]["stems"])
 
 
-# --- per-clip feature and label construction ------------------------------
-
-
 def clip_features(clip, config: DataConfig = DEFAULT_CONFIG) -> np.ndarray:
-    """Log-mel of the conditioned audio, shape (n_frames, n_mels).
-
-    Transposed relative to `logmel`, because the model consumes time-major
-    sequences.
-    """
+    """Log-mel of the conditioned audio, shape (n_frames, n_mels), time-major."""
     audio = read_audio(clip, target_sr=config.sample_rate)
     audio = highpass(audio, config.sample_rate, config.highpass_hz, config.highpass_order)
     mel = logmel(
@@ -75,14 +56,10 @@ def clip_features(clip, config: DataConfig = DEFAULT_CONFIG) -> np.ndarray:
 
 
 def clip_example(clip, convention: str, config: DataConfig = DEFAULT_CONFIG):
-    """Features and labels for one clip, guaranteed to share a frame count.
+    """Features and labels for one clip, sharing a frame count.
 
-    `logmel` is asked for exactly `n_frames_for(duration)` frames and
-    `make_labels` derives its grid from the same call, so in practice they
-    already agree. The truncation below is a guard, not routine behavior: if
-    the two ever disagree, both are cut to the shorter length rather than one
-    being padded, because padding would invent a labeled frame with no audio
-    behind it. Cutting loses at most 10 ms from the end of a clip.
+    Both take their grid from n_frames_for(duration); if they ever disagree the
+    truncation cuts both rather than padding a label with no audio behind it.
     """
     if convention not in CONVENTIONS:
         raise ValueError(f"convention must be one of {CONVENTIONS}, got {convention!r}")
@@ -91,12 +68,7 @@ def clip_example(clip, convention: str, config: DataConfig = DEFAULT_CONFIG):
     labels = make_labels(clip, fps=config.fps, bridge_gap_s=config.bridge_gap_s)[convention]
 
     n = min(len(features), len(labels))
-    features, labels = features[:n], labels[:n]
-    assert len(features) == len(labels) == n
-    return features, np.asarray(labels, dtype=np.int64)
-
-
-# --- training statistics --------------------------------------------------
+    return features[:n], np.asarray(labels[:n], dtype=np.int64)
 
 
 def training_feature_stats(
@@ -107,15 +79,8 @@ def training_feature_stats(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Per-mel-bin mean and std over the training partition only.
 
-    Train statistics only, applied unchanged to val and test. Recomputing
-    statistics per partition would let the evaluation sets set their own scale,
-    which leaks information about the test distribution into the input the
-    model sees and quietly flatters any result measured on it. Per-clip
-    normalization has the same problem in a subtler form: it would remove
-    absolute level, which is part of what separates speech from silence.
-
-    Accumulated in one pass with running sums, so the training partition never
-    has to be held in memory at once.
+    Applied unchanged to val and test: per-partition statistics would leak the
+    test distribution, and per-clip normalization would remove absolute level.
     """
     split_data = split if isinstance(split, dict) else load_split(split)
     directory = _resolve(dataset_dir or split_data["dataset_dir"])
@@ -155,28 +120,19 @@ def training_feature_stats(
 
 
 def load_feature_stats(path=DEFAULT_STATS) -> tuple[np.ndarray, np.ndarray]:
-    """Read saved training statistics."""
     path = _resolve(path)
     if not path.exists():
-        raise FileNotFoundError(
-            f"no feature statistics at {path}\n"
-            "  create them once with: python -c \"from vadexplore.data import "
-            "training_feature_stats; training_feature_stats()\""
-        )
+        raise FileNotFoundError(f"no feature statistics at {path}")
     data = json.loads(path.read_text())
     return (np.asarray(data["mean"], dtype=np.float32),
             np.asarray(data["std"], dtype=np.float32))
 
 
-# --- dataset --------------------------------------------------------------
-
-
 class VADDataset(Dataset):
     """One frozen split partition under one label convention.
 
-    Returns per clip a dict with `features` of shape (n_frames, n_mels),
-    `labels` of shape (n_frames,), and `stem`. Features are normalized with
-    training-partition statistics regardless of which partition this is.
+    Yields {features (n_frames, n_mels), labels (n_frames,), stem}, always
+    normalized with training-partition statistics.
     """
 
     def __init__(
@@ -223,10 +179,8 @@ class VADDataset(Dataset):
 def collate(batch: list[dict], ignore_index: int | None = None) -> dict:
     """Pad a batch to its longest clip and mark the real frames.
 
-    Returns `features` (B, T, n_mels), `labels` (B, T), `mask` (B, T) with True
-    on real frames, `lengths` (B,), and the list of stems. Padded feature rows
-    are zeros and padded label positions carry `ignore_index`, so a masked loss
-    and an ignore-index loss both work without the caller reshaping anything.
+    features (B, T, n_mels), labels (B, T), mask (B, T), lengths (B,), stems.
+    Padded rows are zeros and padded labels carry ignore_index.
     """
     if ignore_index is None:
         ignore_index = DEFAULT_CONFIG.ignore_index
@@ -254,20 +208,13 @@ def collate(batch: list[dict], ignore_index: int | None = None) -> dict:
     }
 
 
-# --- sanity accessor ------------------------------------------------------
-
-
 def describe_split(
     split=DEFAULT_SPLIT,
     config: DataConfig = DEFAULT_CONFIG,
     dataset_dir=None,
     printout: bool = True,
 ) -> dict:
-    """Clip count, hours, and speech fraction per partition and convention.
-
-    Reads labels only, no audio, so it is cheap. The speech fractions are the
-    check that the committed labels still match the exploration numbers.
-    """
+    """Clip count, hours, and speech fraction per partition. Labels only, no audio."""
     split_data = split if isinstance(split, dict) else load_split(split)
     directory = _resolve(dataset_dir or split_data["dataset_dir"])
 

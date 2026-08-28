@@ -1,9 +1,4 @@
-"""Train one VAD model. Lean single-run path, no sweeps.
-
-Everything upstream is reused unchanged: the frozen split and feature
-statistics from `vadexplore.data`, the model from `vadexplore.model`, and the
-fixed frame grid. This module only adds the loop, the loss weighting, and
-enough detection metrics to select a checkpoint on something meaningful.
+"""Train one VAD model. Single run, no sweeps.
 
     python vadexplore/train.py --config configs/train.yaml --name bigru_bridged \\
         --core bigru --label bridged
@@ -11,8 +6,6 @@ enough detection metrics to select a checkpoint on something meaningful.
     python vadexplore/train.py --config configs/train.yaml --name attn_bridged \\
         --core causal_attn --label bridged --past-window-frames 100 \\
         --lookahead-frames 5
-
-torch, numpy, pyyaml, and tqdm.
 """
 
 from __future__ import annotations
@@ -50,21 +43,12 @@ from vadexplore.model import VADModel
 PARTITIONS = ("train", "val", "test")
 
 
-# --- plumbing -------------------------------------------------------------
-
-
 def _resolve(path) -> Path:
     return Path(os.path.expanduser(str(path)))
 
 
 def seed_everything(seed: int) -> None:
-    """Seed python, numpy, and torch for one run.
-
-    This fixes initialization, shuffling, and dropout for a given seed, so two
-    runs of the same config agree. It is per-run reproducibility, not a claim
-    that results are seed-independent: comparing two cores or two label
-    conventions still needs several seeds before a small gap means anything.
-    """
+    """Seed python, numpy, and torch. Per-run reproducibility, not seed independence."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -72,12 +56,10 @@ def seed_everything(seed: int) -> None:
 
 
 def resolve_device(spec: str = "auto") -> torch.device:
-    """Resolve the config `device` field.
+    """Resolve the config device field.
 
-    `auto` prefers cuda, then mps, then cpu. Any explicit value is honored and
-    fails loudly when that backend is missing, rather than silently dropping to
-    cpu and turning a misconfigured GPU run into a very slow one that still
-    reports success.
+    An explicit value fails loudly when that backend is missing, rather than
+    dropping to cpu and turning a GPU run into a very slow one that still passes.
     """
     spec = (spec or "auto").lower()
 
@@ -121,12 +103,11 @@ def describe_device(device: torch.device) -> str:
 def synchronize(device: torch.device) -> None:
     """Flush queued work so a wall-clock reading measures finished compute.
 
-    Both cuda and mps dispatch asynchronously, so timing without this measures
-    how fast the queue filled rather than how long the epoch took.
+    cuda and mps both dispatch asynchronously.
     """
     if device.type == "cuda":
         torch.cuda.synchronize()
-    elif device.type == "mps" and hasattr(torch, "mps"):
+    elif device.type == "mps":
         torch.mps.synchronize()
 
 
@@ -142,12 +123,7 @@ def format_duration(seconds: float) -> str:
 
 
 def progress_enabled(setting, no_progress_flag: bool = False) -> bool:
-    """Bars on for an interactive terminal, off for a redirected log.
-
-    A headless run on a remote box writes to a file or a job log, and bar
-    control characters make those unreadable, so the default follows the TTY
-    and the printed epoch summary carries the information either way.
-    """
+    """Bars on for an interactive terminal, off for a redirected log."""
     if no_progress_flag:
         return False
     if setting in (True, False):
@@ -156,11 +132,9 @@ def progress_enabled(setting, no_progress_flag: bool = False) -> bool:
 
 
 class CachedDataset(Dataset):
-    """Memoizes a dataset's items so features are built once, not once per epoch.
+    """Memoizes items so features are built once, not once per epoch.
 
-    Wraps rather than modifies `VADDataset`. The whole training partition is
-    roughly 130 MB of float32 log-mel, which is worth trading for the repeated
-    decode, filter, and spectrogram work.
+    About 130 MB of float32 log-mel for the training partition.
     """
 
     def __init__(self, dataset: Dataset, enabled: bool = True):
@@ -179,15 +153,10 @@ class CachedDataset(Dataset):
         return self._cache[index]
 
 
-# --- loss weighting -------------------------------------------------------
-
-
 def training_class_counts(split, convention: str, config: DataConfig) -> tuple[int, int]:
-    """(speech frames, non-speech frames) over the TRAINING partition only.
+    """(speech frames, non-speech frames) over the training partition only.
 
-    Reads labels, never audio, and never touches val or test. Class priors are
-    a property of the training distribution; taking them from a held-out set
-    would leak its balance into the objective.
+    Labels only, never audio, and never val or test.
     """
     split_data = split if isinstance(split, dict) else load_split(split)
     directory = _resolve(split_data["dataset_dir"])
@@ -202,23 +171,15 @@ def training_class_counts(split, convention: str, config: DataConfig) -> tuple[i
 
 
 def compute_pos_weight(split, convention: str, config: DataConfig) -> float:
-    """`pos_weight` for BCEWithLogitsLoss, as non-speech over speech.
+    """pos_weight for BCEWithLogitsLoss, as non-speech over speech.
 
-    `BCEWithLogitsLoss` multiplies the positive term of the loss by
-    `pos_weight`, so the standard inverse-frequency setting is
-    negatives / positives. Here the positive class is speech and it is the
-    majority at roughly 81 percent of frames, so the weight comes out near
-    0.23: it damps the majority class rather than boosting it, which is the
-    opposite of the usual voice-activity intuition and is correct for this
-    corpus.
+    Speech is the majority here, about 81 percent of frames, so the weight lands
+    near 0.23 and damps the majority class.
     """
     speech, non_speech = training_class_counts(split, convention, config)
     if speech == 0:
         raise ValueError("training partition has no speech frames")
     return non_speech / speech
-
-
-# --- detection metrics ----------------------------------------------------
 
 
 def roc_auc(scores: np.ndarray, labels: np.ndarray) -> float:
@@ -260,16 +221,8 @@ def false_alarm_events(prediction: np.ndarray, labels: np.ndarray,
                        clip_start: np.ndarray, min_frames: int = 1) -> int:
     """Count runs of false-positive frames, never merging across clips.
 
-    An operator hears one interruption per burst, not one per frame, so a
-    per-hour rate has to count events. `clip_start` marks the first frame of
-    each clip in the concatenated array and forces a run boundary there.
-
-    `min_frames` drops runs shorter than that. A one or two frame blip is
-    10 to 20 ms of spurious speech, below what a listener notices and below
-    what survives any output smoothing, so counting it as a false alarm makes
-    the metric measure jitter rather than audible errors. Measured on this
-    corpus, roughly half of all false-positive runs at threshold 0.5 are
-    3 frames or shorter.
+    clip_start forces a run boundary at each clip. min_frames drops runs below
+    what a listener notices; about half at threshold 0.5 are 3 frames or shorter.
     """
     false_positive = prediction & ~labels
     if not false_positive.any():
@@ -295,16 +248,10 @@ def frr_at_fa_per_hour(
     n_thresholds: int = 101,
     min_fa_frames: int = 3,
 ) -> dict:
-    """Miss rate at the strictest operating point meeting the false-alarm budget.
+    """Miss rate at the best operating point meeting the false-alarm budget.
 
-    The false-alarm rate is scanned on a threshold grid rather than searched,
-    because event counts are not monotonic in the threshold: raising it can
-    split one long false alarm into two shorter ones and increase the count.
-
-    This metric needs a validation set large enough to resolve the budget. At
-    10 false alarms per hour a half-hour validation split permits about five
-    events in total, so the measurement is coarse and jumpy; `budget_met`
-    records whether any threshold satisfied it at all.
+    Scanned, not searched: event counts are not monotonic in the threshold.
+    budget_met says whether any threshold met it at all.
     """
     labels = labels.astype(bool)
     grid = np.quantile(scores, np.linspace(0.0, 1.0, int(n_thresholds)))
@@ -328,9 +275,6 @@ def frr_at_fa_per_hour(
                 "fa_per_hour": float("nan"), "budget_met": False}
     best["budget_met"] = True
     return best
-
-
-# --- evaluation -----------------------------------------------------------
 
 
 @torch.no_grad()
@@ -399,9 +343,6 @@ SELECTION = {  # metric name -> True when lower is better
 }
 
 
-# --- configuration --------------------------------------------------------
-
-
 def load_config(path) -> dict:
     return yaml.safe_load(_resolve(path).read_text())
 
@@ -459,12 +400,9 @@ def build_configs(config: dict) -> tuple[DataConfig, ModelConfig]:
     return data_config, model_config
 
 
-# --- training -------------------------------------------------------------
-
-
 def train(config: dict, verbose: bool = True, no_progress: bool = False) -> dict:
     if not config.get("name"):
-        raise ValueError("a run name is required, pass --name or set it in the config")
+        raise ValueError("a run name is required")
 
     seed_everything(int(config["seed"]))
     device = resolve_device(config["device"])
@@ -515,7 +453,6 @@ def train(config: dict, verbose: bool = True, no_progress: bool = False) -> dict
             generator=torch.Generator().manual_seed(int(config["seed"])),
         )
 
-    # class prior from the training partition only
     if config["loss"]["weighting"] == "inverse_freq":
         pos_weight_value = compute_pos_weight(split, convention, data_config)
     elif config["loss"]["weighting"] == "none":
@@ -667,20 +604,6 @@ def train(config: dict, verbose: bool = True, no_progress: bool = False) -> dict
         else:
             since_improved += 1
 
-        if verbose and epoch == 1:
-            per_epoch = record["seconds"]
-            print(f"  first epoch took {format_duration(per_epoch)} "
-                  f"(train {format_duration(train_seconds)}, "
-                  f"val {format_duration(val_seconds)}); "
-                  f"estimated total for {epochs} epochs "
-                  f"{format_duration(per_epoch * epochs)}")
-
-        if verbose and epoch == 1 and metrics["frr_at_fa"] > 0.5:
-            print(f"  note: the {config['eval']['target_fa_per_hour']:.0f} fa/h budget "
-                  f"forces frr above 50 percent on {metrics['hours']:.2f} h of validation "
-                  f"({metrics['hours'] * config['eval']['target_fa_per_hour']:.1f} events "
-                  f"allowed in total). Selection will be coarse; treat eer and auc as "
-                  f"the readable numbers and set the target from a product requirement.")
         if verbose:
             print(f"  epoch {epoch:3d}  train {train_loss:.4f}  val {metrics['val_loss']:.4f}  "
                   f"eer {metrics['eer']*100:5.2f}%  auc {metrics['auc']:.4f}  "
@@ -751,20 +674,7 @@ def train(config: dict, verbose: bool = True, no_progress: bool = False) -> dict
     if verbose:
         print(f"  best {select_on} {best:.4f} at epoch {best_epoch}")
         print(f"  checkpoint {best_path}")
-        print(f"\n  timing on {describe_device(device)}")
-        print(f"    total          {format_duration(total_seconds)} "
-              f"over {len(history)} epochs")
-        print(f"    train          {format_duration(train_total)} "
-              f"({format_duration(timing_summary['train']['mean_epoch_seconds'])} per epoch, "
-              f"{timing_summary['train']['clips_per_second']:.1f} clips/s, "
-              f"{timing_summary['train']['frames_per_second']:,.0f} frames/s)")
-        print(f"    validation     {format_duration(val_total)} "
-              f"({format_duration(timing_summary['val']['mean_epoch_seconds'])} per epoch, "
-              f"{timing_summary['val']['clips_per_second']:.1f} clips/s, "
-              f"{timing_summary['val']['frames_per_second']:,.0f} frames/s)")
-        print(f"    other          {format_duration(timing_summary['overhead_seconds'])} "
-              f"(setup, feature caching, checkpoint writes)")
-        print(f"    timing written to {out_dir / 'timing.json'}")
+        print(f"  total {format_duration(total_seconds)} over {len(history)} epochs")
 
     return {"out_dir": out_dir, "best_path": best_path, "history": history,
             "best_epoch": best_epoch, "best_value": best,
@@ -781,9 +691,6 @@ def load_checkpoint(path, device=None) -> tuple[VADModel, dict]:
     if device is not None:
         model.to(device)
     return model, payload
-
-
-# --- CLI ------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:

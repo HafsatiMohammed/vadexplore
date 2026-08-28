@@ -6,9 +6,34 @@
   "hangover_ms": 100.0,
   "thresholds": {
     "clean-trained": 0.7294180486070451,
-    "augmented-trained": 0.7553910912580826,
+    "augmented-trained": 0.549077431460721,
     "silero": 0.9996541142463684,
-    "chosen_on": "clean validation, held fixed across conditions"
+    "chosen_on": "clean validation, held fixed across conditions",
+    "rule": "lowest miss rate meeting 100 FA/hour"
+  },
+  "best_thresholds": {
+    "clean-trained": 0.9328207820653915,
+    "augmented-trained": 0.8871309757232666,
+    "silero": 0.7066274285316471,
+    "chosen_on": "clean validation, held fixed across conditions",
+    "rule": "maximises segment F1 on clean validation; test is never searched",
+    "selection": {
+      "clean-trained": {
+        "threshold": 0.9328207820653915,
+        "segment_f1_on_selection_split": 0.31137724550898205,
+        "n_thresholds_searched": 101
+      },
+      "augmented-trained": {
+        "threshold": 0.8871309757232666,
+        "segment_f1_on_selection_split": 0.3993231810490694,
+        "n_thresholds_searched": 101
+      },
+      "silero": {
+        "threshold": 0.7066274285316471,
+        "segment_f1_on_selection_split": 0.025998142989786446,
+        "n_thresholds_searched": 101
+      }
+    }
   },
   "resource_disjointness": {
     "train_rirs": "train split",
@@ -55,24 +80,88 @@
           "fa_events": 40,
           "fa_per_hour": 80.52475297354427
         },
-        "segment_f1": 0.18035426731078905
+        "segment_f1": 0.18035426731078905,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.01462858376686032,
+            "far": 0.025894723092998954,
+            "accuracy": 0.9834420976698149,
+            "frame_precision": 0.9945991227831203,
+            "frame_recall": 0.9853714162331397,
+            "frame_f1": 0.9899637665194505,
+            "fa_events": 67,
+            "fa_per_hour": 134.87896123068666
+          },
+          "segment_f1": 0.07020408163265307
+        },
+        "at_best_threshold": {
+          "threshold": 0.9328207820653915,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.9328207820653915,
+            "frr": 0.060302423027873926,
+            "far": 0.009371734587251828,
+            "accuracy": 0.9484194221230575,
+            "frame_precision": 0.9979434336775276,
+            "frame_recall": 0.9396975769721261,
+            "frame_f1": 0.9679450645685929,
+            "fa_events": 14,
+            "fa_per_hour": 28.183663540740493
+          },
+          "segment_f1": 0.4078125
+        }
       },
       "augmented-trained": {
-        "eer": 0.023380224398640535,
-        "roc_auc": 0.9937809972615085,
-        "pr_auc": 0.9976595570952594,
+        "eer": 0.020542794488314815,
+        "roc_auc": 0.9947684633160928,
+        "pr_auc": 0.9982756005923604,
         "at_threshold": {
-          "threshold": 0.7553910912580826,
-          "frr": 0.03686160199186251,
-          "far": 0.013975966562173458,
-          "accuracy": 0.9670575472383924,
-          "frame_precision": 0.9970105051408136,
-          "frame_recall": 0.9631383980081375,
-          "frame_f1": 0.9797817902262065,
-          "fa_events": 28,
-          "fa_per_hour": 56.36732708148099
+          "threshold": 0.549077431460721,
+          "frr": 0.024594643833120787,
+          "far": 0.017665882967607106,
+          "accuracy": 0.9765919016703294,
+          "frame_precision": 0.9962715111751287,
+          "frame_recall": 0.9754053561668792,
+          "frame_f1": 0.9857280209476921,
+          "fa_events": 39,
+          "fa_per_hour": 78.51163414920566
         },
-        "segment_f1": 0.363780778395552
+        "segment_f1": 0.2032258064516129,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.02203059317287774,
+            "far": 0.019625130616509927,
+            "accuracy": 0.978381340625297,
+            "frame_precision": 0.9958705226777702,
+            "frame_recall": 0.9779694068271223,
+            "frame_f1": 0.9868387905032308,
+            "fa_events": 50,
+            "fa_per_hour": 100.65594121693033
+          },
+          "segment_f1": 0.16976556184316896
+        },
+        "at_best_threshold": {
+          "threshold": 0.8871309757232666,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.8871309757232666,
+            "frr": 0.0617868734101199,
+            "far": 0.008947230929989551,
+            "accuracy": 0.9472618787990628,
+            "frame_precision": 0.9980333046224519,
+            "frame_recall": 0.9382131265898801,
+            "frame_f1": 0.9671991458074659,
+            "fa_events": 13,
+            "fa_per_hour": 26.17054471640189
+          },
+          "segment_f1": 0.4791344667697063
+        }
       },
       "silero": {
         "eer": 0.061814063369976927,
@@ -89,7 +178,39 @@
           "fa_events": 37,
           "fa_per_hour": 74.48539650052845
         },
-        "segment_f1": 0.0
+        "segment_f1": 0.0,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.026483944319615663,
+            "far": 0.147923197492163,
+            "accuracy": 0.9527196676117141,
+            "frame_precision": 0.9695580882748239,
+            "frame_recall": 0.9735160556803844,
+            "frame_f1": 0.9715330408638064,
+            "fa_events": 391,
+            "fa_per_hour": 787.1294603163952
+          },
+          "segment_f1": 0.011735121542330262
+        },
+        "at_best_threshold": {
+          "threshold": 0.7066274285316471,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.7066274285316471,
+            "frr": 0.034756381449768226,
+            "far": 0.11748955067920586,
+            "accuracy": 0.9510756205718376,
+            "frame_precision": 0.9754653937947494,
+            "frame_recall": 0.9652436185502318,
+            "frame_f1": 0.9703275869670649,
+            "fa_events": 305,
+            "fa_per_hour": 614.001241423275
+          },
+          "segment_f1": 0.009828009828009828
+        }
       },
       "webrtc mode 2": {
         "eer": null,
@@ -106,7 +227,39 @@
           "fa_events": 811,
           "fa_per_hour": 1632.6393665386101
         },
-        "segment_f1": 0.22181372549019607
+        "segment_f1": 0.22181372549019607,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.01768520205393953,
+            "far": 0.312042842215256,
+            "accuracy": 0.9319062557667467,
+            "frame_precision": 0.9384032280936973,
+            "frame_recall": 0.9823147979460605,
+            "frame_f1": 0.9598570585578605,
+            "fa_events": 811,
+            "fa_per_hour": 1632.6393665386101
+          },
+          "segment_f1": 0.22181372549019607
+        },
+        "at_best_threshold": {
+          "threshold": 0.5,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.01768520205393953,
+            "far": 0.312042842215256,
+            "accuracy": 0.9319062557667467,
+            "frame_precision": 0.9384032280936973,
+            "frame_recall": 0.9823147979460605,
+            "frame_f1": 0.9598570585578605,
+            "fa_events": 811,
+            "fa_per_hour": 1632.6393665386101
+          },
+          "segment_f1": 0.22181372549019607
+        }
       }
     },
     "noise": {
@@ -125,24 +278,88 @@
           "fa_events": 578,
           "fa_per_hour": 1163.5826804677147
         },
-        "segment_f1": 0.06126482213438735
+        "segment_f1": 0.06126482213438735,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.01665958178984231,
+            "far": 0.6684299895506792,
+            "accuracy": 0.8717251869124908,
+            "frame_precision": 0.876838102572742,
+            "frame_recall": 0.9833404182101577,
+            "frame_f1": 0.9270404284891876,
+            "fa_events": 645,
+            "fa_per_hour": 1298.4616416984013
+          },
+          "segment_f1": 0.033613445378151266
+        },
+        "at_best_threshold": {
+          "threshold": 0.9328207820653915,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.9328207820653915,
+            "frr": 0.1859544003832581,
+            "far": 0.39044540229885055,
+            "accuracy": 0.7790266570484323,
+            "frame_precision": 0.9098272260390193,
+            "frame_recall": 0.8140455996167419,
+            "frame_f1": 0.8592755088958848,
+            "fa_events": 396,
+            "fa_per_hour": 797.1950544380883
+          },
+          "segment_f1": 0.10391978122151321
+        }
       },
       "augmented-trained": {
-        "eer": 0.04649825600347333,
-        "roc_auc": 0.9870016670973928,
-        "pr_auc": 0.9958511851713262,
+        "eer": 0.03578883646778057,
+        "roc_auc": 0.9901744247530909,
+        "pr_auc": 0.9971336575845939,
         "at_threshold": {
-          "threshold": 0.7553910912580826,
-          "frr": 0.08044371571425679,
-          "far": 0.02380485893416928,
-          "accuracy": 0.9292556493147008,
-          "frame_precision": 0.9946792204948544,
-          "frame_recall": 0.9195562842857432,
-          "frame_f1": 0.9556436768309999,
-          "fa_events": 56,
-          "fa_per_hour": 112.73465416296197
+          "threshold": 0.549077431460721,
+          "frr": 0.05204348090119633,
+          "far": 0.02318443051201672,
+          "accuracy": 0.9528986115072109,
+          "frame_precision": 0.9949716713881019,
+          "frame_recall": 0.9479565190988036,
+          "frame_f1": 0.9708952567872482,
+          "fa_events": 55,
+          "fa_per_hour": 110.72153533862337
         },
-        "segment_f1": 0.3376230128690386
+        "segment_f1": 0.3378058405682715,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.04677368204422313,
+            "far": 0.025960031347962383,
+            "accuracy": 0.9567906412342655,
+            "frame_precision": 0.9944040094040798,
+            "frame_recall": 0.9532263179557768,
+            "frame_f1": 0.9733798648839523,
+            "fa_events": 67,
+            "fa_per_hour": 134.87896123068666
+          },
+          "segment_f1": 0.30524642289348175
+        },
+        "at_best_threshold": {
+          "threshold": 0.8871309757232666,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.8871309757232666,
+            "frr": 0.12833748304690187,
+            "far": 0.011037095088819227,
+            "accuracy": 0.8917501272179257,
+            "frame_precision": 0.9973903845708418,
+            "frame_recall": 0.8716625169530982,
+            "frame_f1": 0.9302977056358112,
+            "fa_events": 16,
+            "fa_per_hour": 32.20990118941771
+          },
+          "segment_f1": 0.2700361010830325
+        }
       },
       "silero": {
         "eer": 0.08450729684144792,
@@ -159,7 +376,39 @@
           "fa_events": 10,
           "fa_per_hour": 20.131188243386067
         },
-        "segment_f1": 0.0
+        "segment_f1": 0.0,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.040215110355390916,
+            "far": 0.19390020898641588,
+            "accuracy": 0.9334664228556091,
+            "frame_precision": 0.9599273861021319,
+            "frame_recall": 0.9597848896446091,
+            "frame_f1": 0.9598561325847549,
+            "fa_events": 466,
+            "fa_per_hour": 938.1133721417907
+          },
+          "segment_f1": 0.02280130293159609
+        },
+        "at_best_threshold": {
+          "threshold": 0.7066274285316471,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.7066274285316471,
+            "frr": 0.05955345033501346,
+            "far": 0.12842868338557994,
+            "accuracy": 0.9286517136673992,
+            "frame_precision": 0.9725559974879632,
+            "frame_recall": 0.9404465496649865,
+            "frame_f1": 0.9562317975527678,
+            "fa_events": 344,
+            "fa_per_hour": 692.5128755724807
+          },
+          "segment_f1": 0.023112480739599383
+        }
       },
       "webrtc mode 2": {
         "eer": null,
@@ -176,7 +425,39 @@
           "fa_events": 1009,
           "fa_per_hour": 2031.2368937576541
         },
-        "segment_f1": 0.04535864978902953
+        "segment_f1": 0.04535864978902953,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.026740349385639968,
+            "far": 0.6912225705329154,
+            "accuracy": 0.8594675300709624,
+            "frame_precision": 0.8720255368543238,
+            "frame_recall": 0.97325965061436,
+            "frame_f1": 0.9198656934865168,
+            "fa_events": 1009,
+            "fa_per_hour": 2031.2368937576541
+          },
+          "segment_f1": 0.04535864978902953
+        },
+        "at_best_threshold": {
+          "threshold": 0.5,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.026740349385639968,
+            "far": 0.6912225705329154,
+            "accuracy": 0.8594675300709624,
+            "frame_precision": 0.8720255368543238,
+            "frame_recall": 0.97325965061436,
+            "frame_f1": 0.9198656934865168,
+            "fa_events": 1009,
+            "fa_per_hour": 2031.2368937576541
+          },
+          "segment_f1": 0.04535864978902953
+        }
       }
     },
     "reverb": {
@@ -195,24 +476,88 @@
           "fa_events": 319,
           "fa_per_hour": 642.1849049640156
         },
-        "segment_f1": 0.10616438356164384
+        "segment_f1": 0.10616438356164384,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.015215616418021228,
+            "far": 0.15673981191222572,
+            "accuracy": 0.9605484630396975,
+            "frame_precision": 0.9681587815427071,
+            "frame_recall": 0.9847843835819787,
+            "frame_f1": 0.9764008148492562,
+            "fa_events": 399,
+            "fa_per_hour": 803.2344109111041
+          },
+          "segment_f1": 0.06233766233766233
+        },
+        "at_best_threshold": {
+          "threshold": 0.9328207820653915,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.9328207820653915,
+            "frr": 0.0797824605439836,
+            "far": 0.0644265935214211,
+            "accuracy": 0.9228472210572229,
+            "frame_precision": 0.985739273736556,
+            "frame_recall": 0.9202175394560164,
+            "frame_f1": 0.9518521749751356,
+            "fa_events": 173,
+            "fa_per_hour": 348.26955661057895
+          },
+          "segment_f1": 0.1594792514239219
+        }
       },
       "augmented-trained": {
-        "eer": 0.03111943075166934,
-        "roc_auc": 0.9924359042506519,
-        "pr_auc": 0.9972924322193436,
+        "eer": 0.026350437581304488,
+        "roc_auc": 0.9945694477089098,
+        "pr_auc": 0.9985474371494344,
         "at_threshold": {
-          "threshold": 0.7553910912580826,
-          "frr": 0.0437238112588814,
-          "far": 0.020996603970741903,
-          "accuracy": 0.960168207261767,
-          "frame_precision": 0.9954834721773457,
-          "frame_recall": 0.9562761887411186,
-          "frame_f1": 0.9754860291359367,
-          "fa_events": 54,
-          "fa_per_hour": 108.70841651428476
+          "threshold": 0.549077431460721,
+          "frr": 0.03252295837466178,
+          "far": 0.021061912225705328,
+          "accuracy": 0.9694397378471931,
+          "frame_precision": 0.9955217041130892,
+          "frame_recall": 0.9674770416253382,
+          "frame_f1": 0.9812990408272908,
+          "fa_events": 59,
+          "fa_per_hour": 118.7740106359778
         },
-        "segment_f1": 0.3601593625498008
+        "segment_f1": 0.35,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.029412360073682718,
+            "far": 0.023380355276907003,
+            "accuracy": 0.9716206165735599,
+            "frame_precision": 0.9950470392916436,
+            "frame_recall": 0.9705876399263172,
+            "frame_f1": 0.9826651591901981,
+            "fa_events": 67,
+            "fa_per_hour": 134.87896123068666
+          },
+          "segment_f1": 0.3152789005658852
+        },
+        "at_best_threshold": {
+          "threshold": 0.8871309757232666,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.8871309757232666,
+            "frr": 0.07696200481771624,
+            "far": 0.008424764890282132,
+            "accuracy": 0.9347749500914292,
+            "frame_precision": 0.9981175440516581,
+            "frame_recall": 0.9230379951822838,
+            "frame_f1": 0.9591106997875608,
+            "fa_events": 10,
+            "fa_per_hour": 20.131188243386067
+          },
+          "segment_f1": 0.4021325209444021
+        }
       },
       "silero": {
         "eer": 0.0671704600132577,
@@ -229,7 +574,39 @@
           "fa_events": 9,
           "fa_per_hour": 18.118069419047462
         },
-        "segment_f1": 0.0
+        "segment_f1": 0.0,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.035478364135678765,
+            "far": 0.12049373040752351,
+            "accuracy": 0.949962813221717,
+            "frame_precision": 0.9748354758413749,
+            "frame_recall": 0.9645216358643213,
+            "frame_f1": 0.9696511304512988,
+            "fa_events": 388,
+            "fa_per_hour": 781.0901038433794
+          },
+          "segment_f1": 0.02618657937806874
+        },
+        "at_best_threshold": {
+          "threshold": 0.7066274285316471,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.7066274285316471,
+            "frr": 0.0512067906857486,
+            "far": 0.08656609195402298,
+            "accuracy": 0.9427379534410352,
+            "frame_precision": 0.9814958294070429,
+            "frame_recall": 0.9487932093142514,
+            "frame_f1": 0.9648674983188549,
+            "fa_events": 293,
+            "fa_per_hour": 589.8438155312118
+          },
+          "segment_f1": 0.02670856245090338
+        }
       },
       "webrtc mode 2": {
         "eer": null,
@@ -246,7 +623,39 @@
           "fa_events": 656,
           "fa_per_hour": 1320.605948766126
         },
-        "segment_f1": 0.11749174917491749
+        "segment_f1": 0.11749174917491749,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.02643671180745329,
+            "far": 0.24392633228840124,
+            "accuracy": 0.9363183411900887,
+            "frame_precision": 0.9507759217159237,
+            "frame_recall": 0.9735632881925467,
+            "frame_f1": 0.9620346848558798,
+            "fa_events": 656,
+            "fa_per_hour": 1320.605948766126
+          },
+          "segment_f1": 0.11749174917491749
+        },
+        "at_best_threshold": {
+          "threshold": 0.5,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.02643671180745329,
+            "far": 0.24392633228840124,
+            "accuracy": 0.9363183411900887,
+            "frame_precision": 0.9507759217159237,
+            "frame_recall": 0.9735632881925467,
+            "frame_f1": 0.9620346848558798,
+            "fa_events": 656,
+            "fa_per_hour": 1320.605948766126
+          },
+          "segment_f1": 0.11749174917491749
+        }
       }
     },
     "noise+reverb": {
@@ -265,24 +674,88 @@
           "fa_events": 540,
           "fa_per_hour": 1087.0841651428477
         },
-        "segment_f1": 0.03714565004887585
+        "segment_f1": 0.03714565004887585,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.037030289535299556,
+            "far": 0.5835292580982236,
+            "accuracy": 0.86938214028083,
+            "frame_precision": 0.8887193698041536,
+            "frame_recall": 0.9629697104647005,
+            "frame_f1": 0.9243558687513763,
+            "fa_events": 623,
+            "fa_per_hour": 1254.173027562952
+          },
+          "segment_f1": 0.04503582395087001
+        },
+        "at_best_threshold": {
+          "threshold": 0.9328207820653915,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.9328207820653915,
+            "frr": 0.23621654082575927,
+            "far": 0.3492358934169279,
+            "accuracy": 0.7444289732534796,
+            "frame_precision": 0.9136734199693276,
+            "frame_recall": 0.7637834591742407,
+            "frame_f1": 0.8320316950454438,
+            "fa_events": 382,
+            "fa_per_hour": 769.0113908973477
+          },
+          "segment_f1": 0.036681222707423584
+        }
       },
       "augmented-trained": {
-        "eer": 0.053547097678463856,
-        "roc_auc": 0.9862288112140744,
-        "pr_auc": 0.9963499579233116,
+        "eer": 0.046664235093896125,
+        "roc_auc": 0.9896350480956213,
+        "pr_auc": 0.9975029634541431,
         "at_threshold": {
-          "threshold": 0.7553910912580826,
-          "frr": 0.10851332294218066,
-          "far": 0.023772204806687566,
-          "accuracy": 0.9059985348968557,
-          "frame_precision": 0.9945200942423352,
-          "frame_recall": 0.8914866770578194,
-          "frame_f1": 0.9401890041700469,
-          "fa_events": 49,
-          "fa_per_hour": 98.64282239259173
+          "threshold": 0.549077431460721,
+          "frr": 0.06205677347961917,
+          "far": 0.033339864158829675,
+          "accuracy": 0.9428609773691892,
+          "frame_precision": 0.9927085490655374,
+          "frame_recall": 0.9379432265203809,
+          "frame_f1": 0.9645491447802103,
+          "fa_events": 82,
+          "fa_per_hour": 165.07574359576574
         },
-        "segment_f1": 0.24314306893995552
+        "segment_f1": 0.3113207547169812,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.055518444295999406,
+            "far": 0.0381726750261233,
+            "accuracy": 0.9474520066880281,
+            "frame_precision": 0.9917176783993652,
+            "frame_recall": 0.9444815557040006,
+            "frame_f1": 0.9675234234327641,
+            "fa_events": 95,
+            "fa_per_hour": 191.24628831216765
+          },
+          "segment_f1": 0.31075697211155373
+        },
+        "at_best_threshold": {
+          "threshold": 0.8871309757232666,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.8871309757232666,
+            "frr": 0.16182533417002354,
+            "far": 0.009894200626959247,
+            "accuracy": 0.8641927673114239,
+            "frame_precision": 0.9975667145828482,
+            "frame_recall": 0.8381746658299765,
+            "frame_f1": 0.9109509177709496,
+            "fa_events": 18,
+            "fa_per_hour": 36.236138838094924
+          },
+          "segment_f1": 0.1929078014184397
+        }
       },
       "silero": {
         "eer": 0.1033874683652688,
@@ -299,7 +772,39 @@
           "fa_events": 2,
           "fa_per_hour": 4.026237648677213
         },
-        "segment_f1": 0.0
+        "segment_f1": 0.0,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.06987712799336046,
+            "far": 0.15376828631138975,
+            "accuracy": 0.9157565691981636,
+            "frame_precision": 0.9669673672100788,
+            "frame_recall": 0.9301228720066396,
+            "frame_f1": 0.9481873304007786,
+            "fa_events": 403,
+            "fa_per_hour": 811.2868862084586
+          },
+          "segment_f1": 0.020217729393468116
+        },
+        "at_best_threshold": {
+          "threshold": 0.7066274285316471,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.7066274285316471,
+            "frr": 0.11374263678872898,
+            "far": 0.09342345872518286,
+            "accuracy": 0.889737008393587,
+            "frame_precision": 0.9786821849828996,
+            "frame_recall": 0.886257363211271,
+            "frame_f1": 0.930179526220743,
+            "fa_events": 279,
+            "fa_per_hour": 561.6601519904713
+          },
+          "segment_f1": 0.014275517487508922
+        }
       },
       "webrtc mode 2": {
         "eer": null,
@@ -316,7 +821,39 @@
           "fa_events": 943,
           "fa_per_hour": 1898.371051351306
         },
-        "segment_f1": 0.02968270214943705
+        "segment_f1": 0.02968270214943705,
+        "at_default_threshold": {
+          "threshold": 0.5,
+          "note": "neutral 0.5, not tuned on any split",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.03676713696753777,
+            "far": 0.5814393939393939,
+            "accuracy": 0.8699581159444603,
+            "frame_precision": 0.8891006477329347,
+            "frame_recall": 0.9632328630324622,
+            "frame_f1": 0.924683333171397,
+            "fa_events": 943,
+            "fa_per_hour": 1898.371051351306
+          },
+          "segment_f1": 0.02968270214943705
+        },
+        "at_best_threshold": {
+          "threshold": 0.5,
+          "note": "maximises segment F1 on CLEAN VALIDATION, frozen across conditions; test is never searched",
+          "frame": {
+            "threshold": 0.5,
+            "frr": 0.03676713696753777,
+            "far": 0.5814393939393939,
+            "accuracy": 0.8699581159444603,
+            "frame_precision": 0.8891006477329347,
+            "frame_recall": 0.9632328630324622,
+            "frame_f1": 0.924683333171397,
+            "fa_events": 943,
+            "fa_per_hour": 1898.371051351306
+          },
+          "segment_f1": 0.02968270214943705
+        }
       }
     }
   }

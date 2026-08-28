@@ -1,0 +1,147 @@
+Using cache found in /Users/mohammedhafsati/.cache/torch/hub/snakers4_silero-vad_master
+robustness matrix on test (136 clips, bridged labels)
+  clean-trained        fa-budget 0.7294   best-segF1 0.9328 (val segF1 0.311)
+  augmented-trained    fa-budget 0.5491   best-segF1 0.8871 (val segF1 0.399)
+  silero               fa-budget 0.9997   best-segF1 0.7066 (val segF1 0.026)
+  webrtc mode 2        0.5000 by construction, binary output
+
+  building clean ...
+/Users/mohammedhafsati/Documents/research_training/vadexplore/.venv/lib/python3.11/site-packages/webrtcvad.py:1: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+  building noise ...
+  building reverb ...
+  building noise+reverb ...
+
+ROBUSTNESS MATRIX, EER percent on test (lower is better; webrtc is binary so it has no EER)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                         2.00                2.05                6.18                   -
+  noise                        30.35                3.58                8.45                   -
+  reverb                        7.04                2.64                6.72                   -
+  noise+reverb                 30.24                4.67               10.34                   -
+
+  segment F1 (collar 50 ms, 100 ms hangover)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.180               0.203               0.000               0.222
+  noise                        0.061               0.338               0.000               0.045
+  reverb                       0.106               0.350               0.000               0.117
+  noise+reverb                 0.037               0.311               0.000               0.030
+
+  segment F1 at each system's BEST clean-val threshold (collar 50 ms)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.408               0.479               0.010               0.222
+  noise                        0.104               0.270               0.023               0.045
+  reverb                       0.159               0.402               0.027               0.117
+  noise+reverb                 0.037               0.193               0.014               0.030
+
+  segment F1 at neutral threshold 0.5 (collar 50 ms)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.070               0.170               0.012               0.222
+  noise                        0.034               0.305               0.023               0.045
+  reverb                       0.062               0.315               0.026               0.117
+  noise+reverb                 0.045               0.311               0.020               0.030
+
+  degradation from clean, EER points
+  noise                       +28.35               +1.52               +2.27
+  reverb                       +5.04               +0.58               +0.54
+  noise+reverb                +28.24               +2.61               +4.16
+
+  results runs/robustness/.tmp_matrix_test.json/matrix_test.json
+  figure  explore_out/figures/robustness_matrix.png
+Using cache found in /Users/mohammedhafsati/.cache/torch/hub/snakers4_silero-vad_master
+robustness matrix on test (136 clips, bridged labels)
+  clean-trained        fa-budget 0.6286   best-segF1 0.9152 (val segF1 0.340)
+  augmented-trained    fa-budget 0.5491   best-segF1 0.8871 (val segF1 0.399)
+  silero               fa-budget 0.9997   best-segF1 0.7066 (val segF1 0.026)
+  webrtc mode 2        0.5000 by construction, binary output
+
+  building clean ...
+/Users/mohammedhafsati/Documents/research_training/vadexplore/.venv/lib/python3.11/site-packages/webrtcvad.py:1: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+  building noise ...
+  building reverb ...
+  building noise+reverb ...
+
+ROBUSTNESS MATRIX, EER percent on test (lower is better; webrtc is binary so it has no EER)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                         2.02                2.05                6.18                   -
+  noise                        30.85                3.58                8.45                   -
+  reverb                        6.64                2.64                6.72                   -
+  noise+reverb                 30.62                4.67               10.34                   -
+
+  segment F1 (collar 50 ms, 100 ms hangover)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.153               0.203               0.000               0.222
+  noise                        0.066               0.338               0.000               0.045
+  reverb                       0.088               0.350               0.000               0.117
+  noise+reverb                 0.066               0.311               0.000               0.030
+
+  segment F1 at each system's BEST clean-val threshold (collar 50 ms)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.327               0.479               0.010               0.222
+  noise                        0.109               0.270               0.023               0.045
+  reverb                       0.174               0.402               0.027               0.117
+  noise+reverb                 0.054               0.193               0.014               0.030
+
+  segment F1 at neutral threshold 0.5 (collar 50 ms)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.097               0.170               0.012               0.222
+  noise                        0.042               0.305               0.023               0.045
+  reverb                       0.061               0.315               0.026               0.117
+  noise+reverb                 0.050               0.311               0.020               0.030
+
+  degradation from clean, EER points
+  noise                       +28.84               +1.52               +2.27
+  reverb                       +4.62               +0.58               +0.54
+  noise+reverb                +28.60               +2.61               +4.16
+
+  results runs/robustness/.tmp_matrix_bigru.json/matrix_test.json
+  figure  explore_out/figures/robustness_bigru.png
+Using cache found in /Users/mohammedhafsati/.cache/torch/hub/snakers4_silero-vad_master
+robustness matrix on test (136 clips, bridged labels)
+  clean-trained        fa-budget 0.7548   best-segF1 0.7970 (val segF1 0.334)
+  augmented-trained    fa-budget 0.8021   best-segF1 0.7252 (val segF1 0.283)
+  silero               fa-budget 0.9997   best-segF1 0.7066 (val segF1 0.026)
+  webrtc mode 2        0.5000 by construction, binary output
+
+  building clean ...
+/Users/mohammedhafsati/Documents/research_training/vadexplore/.venv/lib/python3.11/site-packages/webrtcvad.py:1: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+  building noise ...
+  building reverb ...
+  building noise+reverb ...
+
+ROBUSTNESS MATRIX, EER percent on test (lower is better; webrtc is binary so it has no EER)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                         2.47                2.96                6.18                   -
+  noise                        25.80                6.89                8.45                   -
+  reverb                        6.23                3.91                6.72                   -
+  noise+reverb                 25.77                8.22               10.34                   -
+
+  segment F1 (collar 50 ms, 100 ms hangover)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.409               0.350               0.000               0.222
+  noise                        0.095               0.185               0.000               0.045
+  reverb                       0.144               0.264               0.000               0.117
+  noise+reverb                 0.037               0.108               0.000               0.030
+
+  segment F1 at each system's BEST clean-val threshold (collar 50 ms)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.429               0.350               0.010               0.222
+  noise                        0.089               0.199               0.023               0.045
+  reverb                       0.158               0.294               0.027               0.117
+  noise+reverb                 0.045               0.127               0.014               0.030
+
+  segment F1 at neutral threshold 0.5 (collar 50 ms)
+  condition            clean-trained   augmented-trained              silero       webrtc mode 2
+  clean                        0.145               0.269               0.012               0.222
+  noise                        0.035               0.188               0.023               0.045
+  reverb                       0.069               0.262               0.026               0.117
+  noise+reverb                 0.015               0.143               0.020               0.030
+
+  degradation from clean, EER points
+  noise                       +23.33               +3.92               +2.27
+  reverb                       +3.76               +0.94               +0.54
+  noise+reverb                +23.30               +5.25               +4.16
+
+  results runs/robustness/.tmp_matrix_causal.json/matrix_test.json
+  figure  explore_out/figures/robustness_causal.png

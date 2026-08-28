@@ -1,14 +1,14 @@
 """Dataset loading for the VAD exploration set.
 
-Looking at the datset; I already saw this type file naming LibriSpeech (speaker-chapter-utterance), 
-and after some Listening I can confirm that same speaker share the same ID.   
+Looking at the datset; I already saw this type file naming LibriSpeech (speaker-chapter-utterance),
+and after some Listening I can confirm that same speaker share the same ID.
 
 The dataset looks like  is a flat directory of paired files sharing a stem:
 
     <speaker>-<chapter>-<utterance>.wav    audio
     <speaker>-<chapter>-<utterance>.json   labels, {"speech_segments": [{"start_time", "end_time"}, ...]}
 
-Metadata scanning (`load_clip`, `load_dataset`) 
+Metadata scanning (`load_clip`, `load_dataset`)
 """
 
 from __future__ import annotations
@@ -56,20 +56,8 @@ class Clip:
     n_touching: int = 0
     n_real_overlap: int = 0
 
-    @property
-    def speech_duration_s(self) -> float:
-        
-        return sum(end - start for start, end in self.segments)
-
-
 def _resolve(path) -> Path:
-    """Expand ~ and return a Path.
-
-    Every public entry point runs its path argument through this. A bare
-    Path("~/Downloads/vad_data") does not expand, and glob() on it quietly
-    matches nothing, so a typo used to look like an empty dataset instead of
-    an error.
-    """
+    """Expand ~. An unexpanded ~ globs to nothing, which reads as an empty dataset."""
     return Path(os.path.expanduser(str(path)))
 
 
@@ -86,20 +74,10 @@ def _classify_segments(
     segments: list[tuple[float, float]],
     tol_s: float = DEFAULT_TOL_S,
 ) -> tuple[int, int, int]:
-    """Sort segment adjacency issues into (zero_length, touching, real_overlap).
+    """Count adjacency issues as (zero_length, touching, real_overlap).
 
-    Forced alignment produces a lot of shared-endpoint noise: adjacent
-    segments meeting at a point, zero-length segments, and float jitter around
-    a common boundary. None of it survives normalize_segments, and none of it
-    changes a frame label at 10 ms resolution, so it is counted rather than
-    warned about.
-
-    A real overlap is one deeper than `tol_s`. For single speaker read speech
-    that should never happen, so it is the only case worth shouting about.
-
-    Zero-length segments are excluded from the adjacency pass. One sitting
-    inside a longer segment is aligner noise, not evidence of overlapping
-    speech, and counting it twice would be misleading.
+    Only real overlap, deeper than tol_s, indicates a problem. Zero-length
+    segments stay out of the adjacency pass so they are not counted twice.
     """
     zero_length = sum(1 for start, end in segments if end - start <= 0)
 
@@ -128,11 +106,7 @@ def _validate(
     duration_s: float,
     tol_s: float = DEFAULT_TOL_S,
 ) -> tuple[list[str], int, int, int]:
-    """Collect loud warnings plus the segment issue counts. Never raises.
-
-    Loud means "a human should look at this clip". Shared-endpoint artifacts
-    are not loud, they are just counted.
-    """
+    """Warnings plus the segment issue counts. Never raises."""
     warnings: list[str] = []
 
     if not segments:
@@ -240,7 +214,7 @@ def load_dataset(directory, limit: int | None = None) -> list[Clip]:
 
 def _resample(x: np.ndarray, sr: int, target_sr: int) -> np.ndarray:
     """Resample a mono signal by linear interpolation
-    I could use librosa but this is an opportunity to showcase my understanding of audio signal processing 
+    I could use librosa but this is an opportunity to showcase my understanding of audio signal processing
     """
     if sr == target_sr:
         return x
@@ -270,11 +244,7 @@ def read_audio(clip: Clip, target_sr: int = DEFAULT_SR) -> np.ndarray:
 
 
 def summarize(clips) -> str:
-    """One-line data hygiene summary over a list of clips.
-
-    The three artifact counts are what make the case that the overlap noise in
-    this corpus is benign: many clips touch, none genuinely overlap.
-    """
+    """One-line hygiene summary over a list of clips."""
     speakers = {c.speaker_id for c in clips}
     total_minutes = sum(c.duration_s for c in clips) / 60.0
     n_zero = sum(1 for c in clips if c.n_zero_length)

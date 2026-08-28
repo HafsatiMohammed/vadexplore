@@ -1,18 +1,8 @@
-"""Sweep the causal attention model's past window and find the elbow.
+"""Sweep the attention model's past window and find the elbow.
 
-Only `past_window_frames` varies. Seed, label, lookahead, epochs, and device
-are held fixed across runs, so any difference in validation EER is attributable
-to how much history the model is allowed to see.
-
-Windows are specified in EFFECTIVE seconds, which is what a deployment budget
-is quoted in. The model takes a per-layer value, and the two differ by the
-attention depth because the window composes across layers, so the conversion
-is done here and printed for every run.
+Windows are given in effective seconds; the model takes a per-layer value.
 
     python scripts/sweep_past_window.py --epochs 12
-    python scripts/sweep_past_window.py --epochs 12 --device cuda
-
-torch, matplotlib, and pyyaml, all through vadexplore.train.
 """
 
 from __future__ import annotations
@@ -28,7 +18,6 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 from vadexplore.train import build_configs, load_config, train
 from vadexplore.model import VADModel
@@ -44,30 +33,19 @@ ELBOW_COLOR = "#2f855a"
 
 
 def per_layer_frames(effective_seconds: float, attn_layers: int, fps: int) -> int:
-    """Effective seconds to the per-layer `past_window_frames` the model takes.
+    """Effective seconds to the per-layer past_window_frames the model takes.
 
-    The attention window composes over depth: a stack of L layers each reaching
-    back W frames reaches back L * W in total. The depth is read from the model
-    config rather than assumed, so this stays correct if the architecture
-    changes.
+    L layers each reaching back W frames reach back L * W in total.
     """
     if attn_layers < 1:
         raise ValueError(f"attn_layers must be at least 1, got {attn_layers}")
     return max(1, int(round(effective_seconds * fps / attn_layers)))
 
 
-def run_name(window) -> str:
-    return f"attn_pw_{UNBOUNDED}" if window == UNBOUNDED else f"attn_pw_{window:g}s"
-
-
 def best_epoch_by_eer(history_path: Path) -> dict:
     """Pick the epoch with the lowest validation EER.
 
-    EER is the selection here rather than the trainer's own frr_at_fa, because
-    frr_at_fa is measured against a false-alarm budget that only a handful of
-    events fit into on a validation split this size, so it is too jumpy to rank
-    five runs by. The checkpoint on disk is still the trainer's choice; this
-    only decides which epoch's numbers the sweep reports.
+    EER rather than frr_at_fa, which is too jumpy on a split this size to rank by.
     """
     history = json.loads(history_path.read_text())
     epochs = history["epochs"]
@@ -106,7 +84,7 @@ def find_elbow(results: list[dict], tolerance_points: float) -> dict:
             "closest_gap_points": bounded[-1]["eer"] * 100 - reference_eer}
 
 
-def make_figure(results: list[dict], elbow: dict, settings: dict, path: Path) -> None:
+def make_figure(results: list[dict], elbow: dict, path: Path) -> None:
     bounded = sorted((r for r in results if r["window"] != UNBOUNDED),
                      key=lambda r: r["window"])
     reference = next((r for r in results if r["window"] == UNBOUNDED), None)
@@ -145,11 +123,7 @@ def make_figure(results: list[dict], elbow: dict, settings: dict, path: Path) ->
 
     axes[0].set_title("Accuracy against available history", fontsize=10.5, pad=8)
     axes[1].set_title("Operating point at the false-alarm budget", fontsize=10.5, pad=8)
-    fig.suptitle(
-        f"Causal attention past-window sweep  "
-        f"(label {settings['label']}, lookahead {settings['lookahead_frames']} frames per layer, "
-        f"{settings['attn_layers']} layers, {settings['epochs']} epochs, seed {settings['seed']})",
-        fontsize=11.5)
+    fig.suptitle("Causal attention past-window sweep", fontsize=11.5)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=140, bbox_inches="tight")
@@ -197,7 +171,8 @@ def main(argv=None) -> int:
 
     results = []
     for window in windows:
-        name = run_name(window)
+        name = (f"attn_pw_{UNBOUNDED}" if window == UNBOUNDED
+                else f"attn_pw_{window:g}s")
         config = copy.deepcopy(base)
         config["name"] = name
         config["seed"] = args.seed
@@ -257,11 +232,9 @@ def main(argv=None) -> int:
     (out_dir / "results.json").write_text(json.dumps(payload, indent=2))
 
     figure_path = Path(os.path.expanduser(args.figure))
-    make_figure(results, elbow, settings, figure_path)
+    make_figure(results, elbow, figure_path)
 
-    print("=" * 78)
-    print("PAST-WINDOW SWEEP  (per-run numbers are the lowest-EER epoch)")
-    print("=" * 78)
+    print("\npast-window sweep, per-run numbers are the lowest-EER epoch")
     print(f"  {'window':>10} {'per-layer':>10} {'effective':>10} {'EER%':>7} {'AUC':>7} "
           f"{'FRR@FA%':>8} {'epoch':>6} {'kv KiB':>8}")
     reference = next((r for r in results if r["window"] == UNBOUNDED), None)

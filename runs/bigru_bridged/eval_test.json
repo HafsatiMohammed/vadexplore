@@ -62,12 +62,7 @@
             "collar_s": 0.05,
             "precision": 0.0,
             "recall": 0.0,
-            "f1": 0.0,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.0
           },
           "resolution_caveat": "the test split is 0.50 h, so a budget of 10 per hour allows about 5.0 events in total and the measurement is coarse"
         },
@@ -98,12 +93,7 @@
             "collar_s": 0.05,
             "precision": 0.002565418163160595,
             "recall": 0.003205128205128205,
-            "f1": 0.002849814762040467,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.002849814762040467
           },
           "resolution_caveat": "the test split is 0.50 h, so a budget of 100 per hour allows about 49.7 events in total and the measurement is coarse"
         }
@@ -1562,12 +1552,7 @@
             "collar_s": 0.05,
             "precision": 0.0,
             "recall": 0.0,
-            "f1": 0.0,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.0
           },
           "resolution_caveat": "the test split is 0.50 h, so a budget of 10 per hour allows about 5.0 events in total and the measurement is coarse"
         },
@@ -1598,12 +1583,7 @@
             "collar_s": 0.05,
             "precision": 0.7269938650306749,
             "recall": 0.7707317073170732,
-            "f1": 0.7482241515390686,
-            "postprocessing": {
-              "min_speech_s": null,
-              "min_silence_s": null,
-              "note": "off by default; swept in the post-processing section"
-            }
+            "f1": 0.7482241515390686
           },
           "resolution_caveat": "the test split is 0.50 h, so a budget of 100 per hour allows about 49.7 events in total and the measurement is coarse"
         }
