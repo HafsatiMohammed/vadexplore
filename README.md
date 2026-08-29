@@ -17,18 +17,43 @@ bins, 100 fps**. Frame `i` covers `[i/100, (i+1)/100)` in both features and labe
 
 ## 1. Install
 
+Python is pinned to **3.11** (`>=3.11,<3.12`). Create a virtual environment
+first — the venv is what gives you the `python` command, and its path is baked
+into it, so build it inside the repo and do not move the directory afterwards.
+
 ```bash
 python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"          # dev extra adds pytest and scipy (tests only)
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-Python is pinned to `>=3.11,<3.12`. Every dependency is exact-pinned in
-[pyproject.toml](pyproject.toml) — that file is the single source of truth, and
-`pip install -e .` installs all of it. The list below is only there so you can
-see what each library is actually for before installing.
+Then install, either way — both give the identical pinned set:
 
-### Required libraries
+```bash
+# A. from requirements files
+pip install -r requirements-dev.txt   # runtime + test tools
+pip install -e . --no-deps            # put vadexplore itself on the import path
+
+# B. from pyproject (one command, same result)
+pip install -e ".[dev]"
+```
+
+Drop `-dev` / `[dev]` if you do not intend to run the tests. Torch and
+torchaudio are most of a 2 GB download, so give it a few minutes.
+
+Verify:
+
+```bash
+pytest -q                        # 299 tests, ~13 s, no GPU and no dataset needed
+```
+
+Both routes install the same versions, because
+[requirements.txt](requirements.txt) mirrors `[project.dependencies]` in
+[pyproject.toml](pyproject.toml) line for line, and
+[requirements-dev.txt](requirements-dev.txt) adds the `dev` extra. `pip install
+-e .` is what makes `import vadexplore` work from any directory; every script in
+[scripts/](scripts/) relies on it.
+
+### What each library is for
 
 | Library | Version | Needed for |
 |---|---|---|
@@ -49,10 +74,6 @@ Optional, `dev` extra only:
 |---|---|---|
 | `pytest` | 9.1.1 | the test suite |
 | `scipy` | 1.17.1 | tests only — cross-checks the hand-written high-pass |
-
-```bash
-pytest -q                        # 299 tests, ~13 s, no GPU and no dataset needed
-```
 
 ## 2. External data
 
@@ -661,6 +682,7 @@ vadexplore/            library, no CLI except loader and train
 
 scripts/               every runnable entry point
 configs/               train.yaml, train_aug.yaml, train_clean.yaml
+requirements.txt       runtime pins; requirements-dev.txt adds the test tools
 splits/                split.json, feature_stats.json  (committed, frozen)
 runs/                  per-run checkpoints, metrics, figures
 explore_out/           corpus_stats.json, silero_agreement.json, figures/, examples/

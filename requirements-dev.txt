@@ -1,0 +1,7 @@
+# Everything in requirements.txt plus the test-only tools.
+# Install with:  pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+pytest==9.1.1
+scipy==1.17.1

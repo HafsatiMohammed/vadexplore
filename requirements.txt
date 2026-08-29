@@ -1,0 +1,17 @@
+# Runtime dependencies, exact-pinned. Mirrors [project.dependencies] in
+# pyproject.toml. Install with:  pip install -r requirements.txt
+#
+# This installs the libraries but NOT the vadexplore package itself. To import
+# vadexplore from anywhere (the scripts do), also run:  pip install -e .
+# Or skip this file entirely and just run:  pip install -e ".[dev]"
+
+numpy==2.4.6
+soundfile==0.14.0
+torch==2.13.0
+torchaudio==2.11.0
+matplotlib==3.11.1
+pyyaml==6.0.3
+tqdm==4.70.0
+webrtcvad==2.0.10
+pandas==3.0.5
+sounddevice==0.5.6
