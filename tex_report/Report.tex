@@ -342,7 +342,7 @@ Both cores return a tensor of the same shape, so the head is shared unchanged. B
     same modules in both, so the accuracy gap in Sec~\ref{sec:clean} is attributable to the
     core alone. The BiGRU's $2\times64=128$ output already matches $d_{\text{model}}$, so no
     projection layer is needed between the core and the head. Shapes are those of the
-    trained checkpoints.}
+    trained checkpoints. Let it be known that the number of heads is equal to 4 (four of the two attention layers)}
     \label{fig:archcausal}
     \label{fig:archbigru}
 \end{figure}
