@@ -1,25 +1,21 @@
-# Lean single-model training config. Command-line flags override these.
-# One model per run; sweeps come later.
+# Augmented training config.
+# Command-line flags override these.
 
 name: null                 # required, either here or via --name
 seed: 0
 device: auto               # cuda | mps | cpu | auto
-                           # auto prefers cuda, then mps, then cpu.
-                           # An explicit value fails loudly if that
-                           # backend is missing, so a GPU run cannot
-                           # silently fall back to cpu.
-progress: auto             # auto follows the TTY; true or false to force
+progress: auto             # auto | true | false; auto follows the TTY
 out_root: runs
 
 data:
   split: splits/split.json
   feature_stats: splits/feature_stats.json
   label: bridged           # literal | bridged
-  bridge_gap_s: 0.10       # the committed elbow, see DECISIONS.md
-  highpass_hz: 80.0        # null disables, for the with vs without ablation
+  bridge_gap_s: 0.10       # the committed elbow, see my report §2.1
+  highpass_hz: 80.0        # null disables
   highpass_order: 2
-  cache_features: true     # keep log-mel in memory across epochs
-  limit_clips: null        # cap clips per partition, for quick runs
+  cache_features: true
+  limit_clips: null        # null = all; caps clips per partition
 
 model:
   core: bigru              # bigru | causal_attn
@@ -30,36 +26,30 @@ model:
   # bigru
   gru_hidden: 64
   gru_layers: 2
-  causal: false            # true makes the recurrence unidirectional
+  causal: false
   # causal_attn
   attn_layers: 2
   attn_heads: 4
   attn_ff_ratio: 2
   attn_dropout: 0.1
   lookahead_frames: 0
-  past_window_frames: null # pending sweep, see DECISIONS.md
+  past_window_frames: null # per layer; null = unbounded, see my report §7
 
 augment:
-  enabled: true           # training-time only; val stays clean for selection
-  rir_dir: ~/Documents/research_training/kws-augmentation-kit/rirs
-  musan_dir: ~/Documents/research_training/kws-augmentation-kit/musan
-  rir_split: train         # train rooms for training; hard rooms build test conditions
-  musan_split: train       # 80/20 deterministic filename split, disjoint from test
-  preserve_level: true     # reverb changes the smearing, not the loudness
+  enabled: true
+  rir_dir: path/to/rirs
+  musan_dir: path/to/musan
+  rir_split: train         # train | hard
+  musan_split: train       # train | test
+  preserve_level: true
   reverb_prob: 0.5
   noise_prob: 0.8
-  noise_rir_prob: 0.5      # put the interferer in the room as well
+  noise_rir_prob: 0.5      # probability the interferer also gets a room
   snr_db_range: [0.0, 20.0]
   seed: 0
-  # echo RIRs are never used: that path models the device's own loudspeaker,
-  # which has nothing to do with whether a person is speaking.
 
 loss:
   weighting: inverse_freq  # none | inverse_freq
-  # inverse_freq sets pos_weight = n_nonspeech / n_speech over the TRAIN split
-  # only. BCEWithLogitsLoss multiplies the positive term by pos_weight, and
-  # speech is the majority class here, so the weight is below 1 and it is the
-  # majority class that gets damped.
 
 optim:
   batch_size: 8
@@ -71,12 +61,8 @@ optim:
   min_lr: 0.00001
 
 eval:
-  select_on: frr_at_fa   # frr_at_fa | eer | auc | val_loss
-  target_fa_per_hour: 100.0   # placeholder, set from a product requirement.
-                              # 10/h is a wake-word budget; at frame level on
-                              # this corpus it allows about 5 events across the
-                              # whole 0.48 h validation split and saturates.
-  min_fa_frames: 3            # ignore false-positive runs under 30 ms: too
-                              # short to hear and removed by any smoothing
+  select_on: frr_at_fa        # frr_at_fa | eer | auc | val_loss
+  target_fa_per_hour: 100.0   # placeholder, set from a product requirement
+  min_fa_frames: 3            # ignore false-positive runs under 30 ms
   n_thresholds: 101
-  early_stopping_patience: 8   # null disables
+  early_stopping_patience: 8  # null disables
