@@ -17,7 +17,8 @@ class DataConfig:
     highpass_hz: float | None = 80.0
     highpass_order: int = 2
 
-    # committed at the elbow of the gap distribution, see DECISIONS.md
+    # committed at the elbow of the gap distribution; see my report,
+    # tex_report/Report.pdf §2.1 (label conventions)
     bridge_gap_s: float = 0.10
 
     # padded label positions, matching the torch loss convention

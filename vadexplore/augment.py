@@ -198,8 +198,8 @@ class AugmentConfig:
     """One augmentation setting. `enabled=False` is a pass-through."""
 
     enabled: bool = False
-    rir_dir: str = "~/Documents/research_training/kws-augmentation-kit/rirs"
-    musan_dir: str = "~/Documents/research_training/kws-augmentation-kit/musan"
+    rir_dir: str = "path/to/rirs"
+    musan_dir: str = "path/to/musan"
     rir_split: str = "train"        # train for training, hard for test conditions
     musan_split: str = "train"
 
@@ -218,7 +218,7 @@ class AugmentConfig:
 
 @dataclass
 class AugmentRecord:
-    """What was actually applied, for reproducibility and for the report."""
+    """What was actually applied, for reproducibility and for my report."""
 
     reverb: bool = False
     rir_id: int | None = None

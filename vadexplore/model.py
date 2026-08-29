@@ -597,7 +597,7 @@ def streaming_profile(config: ModelConfig = DEFAULT_MODEL_CONFIG, hop_ms: float 
 
 
 def _methodology_note(config: ModelConfig) -> list[str]:
-    """The sentences that go into the deployment section of the report."""
+    """The sentences that go into the deployment section of my report."""
     if config.temporal != "causal_attn":
         return [
             "The BiGRU core is bidirectional and carries unbounded recurrent state, "

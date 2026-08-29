@@ -17,8 +17,8 @@ DEFAULT_HOP_MS = 1000.0 / DEFAULT_FPS  # 10.0
 LOG_FLOOR = 1e-10
 
 # The committed front-end step, re-exported from `preprocess` so that callers
-# already importing it from here keep working. See the rumble row in
-# DECISIONS.md for why it is committed.
+# already importing it from here keep working. See my report,
+# tex_report/Report.pdf §2.2 (rumble and the high-pass), for why it is committed.
 HIGHPASS_HZ = _HP
 
 
