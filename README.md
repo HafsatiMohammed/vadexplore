@@ -58,9 +58,9 @@ pytest -q                        # 299 tests, ~13 s, no GPU and no dataset neede
 
 | What | Where to get it | Path to point the code at | Needed for |
 |---|---|---|---|
-| VAD corpus (`*.wav` + `*.json` pairs) | [download](TODO-add-link) | `path/to/vad_data` | everything |
-| RIR bank (`rirs/metadata.csv` + `target/`, `noise/` as `.npy`) | [download](TODO-add-link) | `path/to/rirs` | augmentation, robustness |
-| MUSAN (`music/`, `noise/` as `.wav`) | [download](TODO-add-link) | `path/to/musan` | augmentation, robustness |
+| VAD corpus (`*.wav` + `*.json` pairs) | [download](https://drive.google.com/file/d/1qfg9oofmN6N5jRZqw5lne8php9YNgN29/view?usp=share_link) | `path/to/vad_data` | everything |
+| RIR bank (`rirs/metadata.csv` + `target/`, `noise/` as `.npy`) | [download](https://drive.google.com/file/d/1YVsgqawYlHtjspH1msu5KwPN_PMf9IhV/view?usp=share_link) | `path/to/rirs` | augmentation, robustness |
+| MUSAN (`music/`, `noise/` as `.wav`) | [download](https://openslr.trmal.net/resources/17/musan.tar.gz) | `path/to/musan` | augmentation, robustness |
 | Silero VAD | [snakers4/silero-vad](https://github.com/snakers4/silero-vad) | `~/.cache/torch/hub` (fetched automatically) | cross-check, baselines, robustness |
 
 Nothing above is committed. Fetch each one, put it wherever you like, and pass
