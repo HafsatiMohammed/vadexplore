@@ -214,9 +214,9 @@ def main(argv=None) -> int:
     parser.add_argument("--target-fa-per-hour", type=float, default=100.0,
                         dest="target_fa")
     parser.add_argument("--rir-dir",
-                        default="~/Documents/research_training/kws-augmentation-kit/rirs")
+                        default="path/to/rirs")
     parser.add_argument("--musan-dir",
-                        default="~/Documents/research_training/kws-augmentation-kit/musan")
+                        default="path/to/musan")
     parser.add_argument("--limit-clips", type=int, default=None,
                         dest="limit_clips", help="cap clips, for smoke runs")
     parser.add_argument("--device", default=None)

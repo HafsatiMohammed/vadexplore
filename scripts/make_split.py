@@ -17,7 +17,7 @@ from pathlib import Path
 
 from vadexplore.loader import load_dataset
 
-DEFAULT_DIR = "~/Downloads/vad_data"
+DEFAULT_DIR = "path/to/vad_data"
 DEFAULT_STATS = "explore_out/corpus_stats.json"
 DEFAULT_OUT = "splits/split.json"
 PARTITIONS = ("train", "val", "test")

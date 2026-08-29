@@ -20,7 +20,7 @@ from vadexplore.labels import make_labels, normalize_segments
 from vadexplore.loader import load_dataset
 from vadexplore.viz import plot_clip
 
-DEFAULT_DIR = "~/Downloads/vad_data"
+DEFAULT_DIR = "path/to/vad_data"
 DEFAULT_OUT = "explore_out/examples"
 
 

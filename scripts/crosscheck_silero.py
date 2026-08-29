@@ -33,7 +33,7 @@ from vadexplore.silero import (
 )
 from vadexplore.viz import plot_clip
 
-DEFAULT_DIR = "~/Downloads/vad_data"
+DEFAULT_DIR = "path/to/vad_data"
 DEFAULT_OUT = "explore_out"
 
 # Named clips to inspect regardless of where they rank, from earlier analysis.
