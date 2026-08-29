@@ -5,8 +5,9 @@ analysis, a frozen speaker-disjoint split, two swappable temporal models, an
 augmentation and robustness harness, reference-VAD baselines, and a real-time
 microphone demo.
 
-Every design default and the evidence behind it lives in [DECISIONS.md](DECISIONS.md).
-The generated data report lives in [explore_out/DATA_REPORT.md](explore_out/DATA_REPORT.md).
+Every design default, the evidence behind it, and the full experimental
+write-up live in my report: [tex_report/Report.pdf](tex_report/Report.pdf)
+(source: [Report.tex](tex_report/Report.tex)).
 This file is the operating manual: how to run each thing the project offers.
 
 Frame grid is fixed project-wide: **16 kHz, 10 ms hop, 25 ms window, 40 log-mel
@@ -22,21 +23,48 @@ source .venv/bin/activate
 pip install -e ".[dev]"          # dev extra adds pytest and scipy (tests only)
 ```
 
-Python is pinned to `>=3.11,<3.12`. Dependencies are exact-pinned in
-[pyproject.toml](pyproject.toml).
+Python is pinned to `>=3.11,<3.12`. Every dependency is exact-pinned in
+[pyproject.toml](pyproject.toml) — that file is the single source of truth, and
+`pip install -e .` installs all of it. The list below is only there so you can
+see what each library is actually for before installing.
+
+### Required libraries
+
+| Library | Version | Needed for |
+|---|---|---|
+| `numpy` | 2.4.6 | arrays everywhere: features, labels, metrics |
+| `torch` | 2.13.0 | model, training loop, streaming session, Silero via `torch.hub` |
+| `torchaudio` | 2.11.0 | resampling and the mel filterbank |
+| `soundfile` | 0.14.0 | WAV decode in the loader, RIR/MUSAN reads, live recording |
+| `matplotlib` | 3.11.1 | every figure, and the live scrolling display |
+| `pyyaml` | 6.0.3 | training configs in [configs/](configs/) |
+| `tqdm` | 4.70.0 | training progress bars |
+| `pandas` | 3.0.5 | reads the RIR bank `metadata.csv` in `augment.py` |
+| `webrtcvad` | 2.0.10 | the WebRTC reference baseline (§10) |
+| `sounddevice` | 0.5.6 | microphone capture for the live demo (§4) |
+
+Optional, `dev` extra only:
+
+| Library | Version | Needed for |
+|---|---|---|
+| `pytest` | 9.1.1 | the test suite |
+| `scipy` | 1.17.1 | tests only — cross-checks the hand-written high-pass |
 
 ```bash
-pytest -q                        # 300 tests, ~16 s, no GPU and no dataset needed
+pytest -q                        # 299 tests, ~13 s, no GPU and no dataset needed
 ```
 
 ## 2. External data
 
-| What | Default path | Needed for |
-|---|---|---|
-| VAD corpus (`*.wav` + `*.json` pairs) | `~/Downloads/vad_data` | everything |
-| RIR bank (`rirs/metadata.csv` + `target/`, `noise/` as `.npy`) | `~/Documents/research_training/kws-augmentation-kit/rirs` | augmentation, robustness |
-| MUSAN (`music/`, `noise/` as `.wav`) | `~/Documents/research_training/kws-augmentation-kit/musan` | augmentation, robustness |
-| Silero VAD | `~/.cache/torch/hub` | cross-check, baselines, robustness |
+| What | Where to get it | Path to point the code at | Needed for |
+|---|---|---|---|
+| VAD corpus (`*.wav` + `*.json` pairs) | [download](TODO-add-link) | `path/to/vad_data` | everything |
+| RIR bank (`rirs/metadata.csv` + `target/`, `noise/` as `.npy`) | [download](TODO-add-link) | `path/to/rirs` | augmentation, robustness |
+| MUSAN (`music/`, `noise/` as `.wav`) | [download](TODO-add-link) | `path/to/musan` | augmentation, robustness |
+| Silero VAD | [snakers4/silero-vad](https://github.com/snakers4/silero-vad) | `~/.cache/torch/hub` (fetched automatically) | cross-check, baselines, robustness |
+
+Nothing above is committed. Fetch each one, put it wherever you like, and pass
+the path in — no default in this repo points at a real location on your disk.
 
 Silero is fetched once through `torch.hub` and needs network access on that
 first call only:
@@ -48,24 +76,36 @@ python -c "import torch; torch.hub.load('snakers4/silero-vad', 'silero_vad', tru
 If it cannot be fetched, `vadexplore.silero` raises `SileroUnavailable` with
 instructions. It never substitutes a fallback detector.
 
-Every path above is overridable by flag (`--rir-dir`, `--musan-dir`, positional
-`dataset_dir`) or in the YAML config.
+Every path is given by flag (`--rir-dir`, `--musan-dir`, positional
+`dataset_dir`) or in the YAML config. Throughout this file, and in
+[configs/](configs/) and the script defaults, `path/to/...` is a placeholder —
+substitute your own location.
+
+The tests take no flags, so the 12 augmentation tests that need real corpora
+read environment variables instead and skip when they are unset:
+
+```bash
+export VADEXPLORE_DATA_DIR=path/to/vad_data
+export VADEXPLORE_RIR_DIR=path/to/rirs
+export VADEXPLORE_MUSAN_DIR=path/to/musan
+```
 
 ## 3. Pipeline order
 
 ```
-loader ──> labels ──> stats/silero ──> DATA_REPORT.md          (§4 analysis)
+runs/<name>/best.pt ──> live_mic_vad                            (§4 live demo)
+
+loader ──> labels ──> stats/silero ──> figures + JSON            (§5 analysis)
                           │
-                          └──> make_split ──> feature_stats     (§5 split)
+                          └──> make_split ──> feature_stats       (§6 split)
                                     │
-                                    ├──> train ──> runs/<name>/best.pt   (§6)
+                                    ├──> train ──> runs/<name>/best.pt   (§7)
                                     │        └──> augment (train only)
                                     │
-                                    ├──> evaluate ──> eval_test.json      (§7)
-                                    ├──> postproc_sweep                    (§8)
-                                    ├──> eval_baselines (Silero, WebRTC)   (§9)
-                                    ├──> robustness_eval                   (§10)
-                                    └──> live_mic_vad                      (§11)
+                                    ├──> evaluate ──> eval_test.json      (§8)
+                                    ├──> postproc_sweep                    (§9)
+                                    ├──> eval_baselines (Silero, WebRTC)  (§10)
+                                    └──> robustness_eval                  (§11)
 ```
 
 Signal path, identical in training, offline evaluation, and live:
@@ -73,23 +113,87 @@ Signal path, identical in training, offline evaluation, and live:
 with train-partition statistics**. Augmentation, when on, is inserted on the
 waveform *before* the high-pass.
 
+The live demo comes first because the trained checkpoints are committed: you can
+hear the system work before reproducing any of the analysis or the training
+below.
+
 ---
 
-## 4. Data analysis
+## 4. Live microphone demo
+
+```bash
+python scripts/live_mic_vad.py                                  # default runs/sweep_past_window/attn_pw_1s
+python scripts/live_mic_vad.py --run runs/attn_pw_1s --window-seconds 8
+python scripts/live_mic_vad.py --input-wav clip.wav --no-plot   # offline verification, no mic
+```
+
+Requires a `causal_attn` checkpoint. `StreamingVADSession` rejects a BiGRU core
+with an explanatory error: it is bidirectional by default and carries unbounded
+recurrent state, so a windowed KV cache means nothing for it.
+
+Nothing is reimplemented. The high-pass, the log-mel, the saved training feature
+statistics, the model, and the frame-by-frame session are the same objects the
+offline path uses. Normalization uses the **saved training statistics**;
+computing them from live audio would fail quietly, producing plausible-looking
+probabilities that are simply wrong.
+
+**Threading.** The `sounddevice` callback only copies the block into a queue and
+returns. A `FuncAnimation` consumer drains the queue, advances the front-end and
+the model, and redraws. Feature work in the audio callback causes dropouts;
+matplotlib work there causes a crash.
+
+**Causal post-processing** (`CausalPostprocessor`) is the streaming-safe subset:
+trailing median smoothing (no latency, but it reacts half a window late — that
+is the price of causality and it is declared, not hidden) and hangover (fires
+after an offset and extends forward, so it is free). Minimum speech duration is
+deliberately **not** implemented: deciding a segment is long enough means waiting
+for it to end, a delay of the full minimum duration. It stays offline-only.
+
+`latency_report` itemizes every source of delay: audio block, high-pass margin,
+25 ms analysis-window tail, model lookahead (`lookahead_frames × attn_layers`),
+trailing smoothing. Hangover is listed at zero.
+
+![KV cache window, eviction, and emission latency](tex_report/figures/kv_cache_window.png)
+
+Three quantities that are easy to conflate. For the shipped `causal_attn` config
+(`W = 50` per layer, `L = 5` per layer, `D = 2` layers):
+
+| quantity | formula | value |
+| --- | --- | --- |
+| Cache size | `(W + L) × D` | 110 entries, flat from frame 60 onward |
+| Receptive field (past) | `W · D` | 100 frames = 1 s |
+| Emission latency | `L · D` | 10 frames = 100 ms |
+
+**The cache and the window do different jobs.** The cache removes
+recomputation: each frame's key and value are projected once, on the leading
+edge, then reused by every later query that attends to it. But a cache is a
+store, not a bound. The *window* is what bounds memory —
+[`_evict`](vadexplore/model.py#L513) returns immediately when `past_window is
+None`, so with an unbounded window the identical code grows linearly in stream
+length (2395 entries after 12 s, against a flat 110). Constant memory is a
+property of the window, not of the cache.
+
+Flags: `--run --stats --threshold --target-fa-per-hour --window-seconds
+--block-ms --redraw-ms --smooth-ms --hangover-ms --device --record --log
+--input-wav --no-plot`. With no `--threshold`, the operating point is read from
+the run's `eval_test.json` for the given FA target.
+
+---
+
+## 5. Data analysis
 
 ### Run it
 
 ```bash
-python -m vadexplore.loader ~/Downloads/vad_data          # hygiene one-liner
-python scripts/corpus_report.py ~/Downloads/vad_data      # -> explore_out/corpus_stats.json + 8 figures
-python scripts/crosscheck_silero.py ~/Downloads/vad_data  # -> explore_out/silero_agreement.json + figures
-python scripts/plot_examples.py ~/Downloads/vad_data      # -> explore_out/examples/*.png
-python scripts/exploration_summary.py                     # -> explore_out/DATA_REPORT.md
+python -m vadexplore.loader path/to/vad_data          # hygiene one-liner
+python scripts/corpus_report.py path/to/vad_data      # -> explore_out/corpus_stats.json + 8 figures
+python scripts/crosscheck_silero.py path/to/vad_data  # -> explore_out/silero_agreement.json + figures
+python scripts/plot_examples.py path/to/vad_data      # -> explore_out/examples/*.png
 ```
 
-`exploration_summary.py` reads only the two JSON artifacts above; it recomputes
-nothing and hardcodes no number, so the prose cannot drift from the code. A
-missing key is a hard failure naming the key and the script that produces it.
+The two JSON artifacts are the analysis output: every number quoted in the table
+below and in the written report is read back from them, so nothing is hardcoded
+and the prose cannot drift from the code.
 
 ### What analysis is proposed, and by which function
 
@@ -116,14 +220,14 @@ training job without a display stack.
 
 ---
 
-## 5. Freeze the split and the feature statistics
+## 6. Freeze the split and the feature statistics
 
 ```bash
-python scripts/make_split.py ~/Downloads/vad_data          # -> splits/split.json
+python scripts/make_split.py path/to/vad_data          # -> splits/split.json
 ```
 
 Speaker-disjoint. Prefers the proposal already recorded in
-`explore_out/corpus_stats.json` so the frozen split is the one the report
+`explore_out/corpus_stats.json` so the frozen split is the one my report
 describes; otherwise derives it deterministically. Refuses to overwrite an
 existing split without `--force`, because every experiment reads it. Speaker
 disjointness is asserted, not warned about.
@@ -147,7 +251,7 @@ python -c "from vadexplore.data import describe_split; describe_split()"
 
 ---
 
-## 6. Training
+## 7. Training
 
 ```bash
 # clean BiGRU (offline, bidirectional)
@@ -249,11 +353,11 @@ you double the context you asked for.
 Already run: the elbow lands at **0.5 s effective** (25 frames/layer at 2
 layers), and 0.5 s is already 0.34 EER points *better* than unbounded. The
 shipped models use 1 s (`--past-window-frames 50`), the conservative fallback
-named in DECISIONS.md.
+argued for in my report, §7 (*The streaming model and its context*).
 
 ---
 
-## 7. Evaluation
+## 8. Evaluation
 
 ```bash
 python vadexplore/evaluate.py --run runs/bigru_bridged --split test
@@ -288,7 +392,7 @@ Flags: `--split --convention --device --collar-s --fa-targets --batch-size`.
 
 ---
 
-## 8. Post-processing sweep
+## 9. Post-processing sweep
 
 ```bash
 python scripts/postproc_sweep.py --run runs/attn_pw_1s --target-fa-per-hour 100
@@ -320,12 +424,12 @@ Measured on `attn_pw_1s`, single-operation ablations (segment F1, collar 50 ms):
 | **hangover** | **100 ms** | **0.368** | **0.406** |
 
 Hangover wins, which is convenient: it is also the only one of the three that
-streams for free (§11). Writes `runs/postproc/results.json` and three example
+streams for free (§4). Writes `runs/postproc/results.json` and three example
 figures — largest gain, median case, largest regression.
 
 ---
 
-## 9. Reference baselines
+## 10. Reference baselines
 
 ```bash
 python scripts/eval_baselines.py --run runs/bigru_bridged
@@ -343,7 +447,7 @@ Writes `runs/baselines/eval_test.json` and `explore_out/figures/baseline_det.png
 
 ---
 
-## 10. Robustness matrix
+## 11. Robustness matrix
 
 ```bash
 python scripts/robustness_eval.py \
@@ -370,67 +474,6 @@ every system is scored on **byte-identical audio** for a given condition and the
 condition is reproducible. Systems compared: clean-trained model,
 augmented-trained model, Silero, WebRTC mode 2. A 100 ms hangover is applied
 uniformly. Thresholds still come from validation.
-
----
-
-## 11. Live microphone testing
-
-```bash
-python scripts/live_mic_vad.py                                  # default runs/sweep_past_window/attn_pw_1s
-python scripts/live_mic_vad.py --run runs/attn_pw_1s --window-seconds 8
-python scripts/live_mic_vad.py --input-wav clip.wav --no-plot   # offline verification, no mic
-```
-
-Requires a `causal_attn` checkpoint. `StreamingVADSession` rejects a BiGRU core
-with an explanatory error: it is bidirectional by default and carries unbounded
-recurrent state, so a windowed KV cache means nothing for it.
-
-Nothing is reimplemented. The high-pass, the log-mel, the saved training feature
-statistics, the model, and the frame-by-frame session are the same objects the
-offline path uses. Normalization uses the **saved training statistics**;
-computing them from live audio would fail quietly, producing plausible-looking
-probabilities that are simply wrong.
-
-**Threading.** The `sounddevice` callback only copies the block into a queue and
-returns. A `FuncAnimation` consumer drains the queue, advances the front-end and
-the model, and redraws. Feature work in the audio callback causes dropouts;
-matplotlib work there causes a crash.
-
-**Causal post-processing** (`CausalPostprocessor`) is the streaming-safe subset:
-trailing median smoothing (no latency, but it reacts half a window late — that
-is the price of causality and it is declared, not hidden) and hangover (fires
-after an offset and extends forward, so it is free). Minimum speech duration is
-deliberately **not** implemented: deciding a segment is long enough means waiting
-for it to end, a delay of the full minimum duration. It stays offline-only.
-
-`latency_report` itemizes every source of delay: audio block, high-pass margin,
-25 ms analysis-window tail, model lookahead (`lookahead_frames × attn_layers`),
-trailing smoothing. Hangover is listed at zero.
-
-![KV cache window, eviction, and emission latency](tex_report/figures/kv_cache_window.png)
-
-Three quantities that are easy to conflate. For the shipped `causal_attn` config
-(`W = 50` per layer, `L = 5` per layer, `D = 2` layers):
-
-| quantity | formula | value |
-| --- | --- | --- |
-| Cache size | `(W + L) × D` | 110 entries, flat from frame 60 onward |
-| Receptive field (past) | `W · D` | 100 frames = 1 s |
-| Emission latency | `L · D` | 10 frames = 100 ms |
-
-**The cache and the window do different jobs.** The cache removes
-recomputation: each frame's key and value are projected once, on the leading
-edge, then reused by every later query that attends to it. But a cache is a
-store, not a bound. The *window* is what bounds memory —
-[`_evict`](vadexplore/model.py#L513) returns immediately when `past_window is
-None`, so with an unbounded window the identical code grows linearly in stream
-length (2395 entries after 12 s, against a flat 110). Constant memory is a
-property of the window, not of the cache.
-
-Flags: `--run --stats --threshold --target-fa-per-hour --window-seconds
---block-ms --redraw-ms --smooth-ms --hangover-ms --device --record --log
---input-wav --no-plot`. With no `--threshold`, the operating point is read from
-the run's `eval_test.json` for the given FA target.
 
 ---
 
@@ -556,7 +599,7 @@ Nothing below is load-bearing; this is the ship-readiness list.
 | `data.describe_split` | [vadexplore/data.py:260](vadexplore/data.py#L260) |
 | `model.parameter_report` | [vadexplore/model.py:435](vadexplore/model.py#L435) |
 | `model.masked_bce_loss` | [vadexplore/model.py:447](vadexplore/model.py#L447) — `train.py` builds its own `nn.BCEWithLogitsLoss` |
-| `model.streaming_profile`, `model.print_streaming_profile` | [vadexplore/model.py:704](vadexplore/model.py#L704) — intended for the deployment section of the report, never wired in |
+| `model.streaming_profile`, `model.print_streaming_profile` | [vadexplore/model.py:704](vadexplore/model.py#L704) — intended for the deployment section of my report, never wired in |
 | `VADModel.is_causal`, `VADModel.forward_batch` | [vadexplore/model.py:394](vadexplore/model.py#L394) |
 | `StreamingVADSession.run`, `.cached_entries` | [vadexplore/model.py:562](vadexplore/model.py#L562) |
 | `PostprocessConfig.is_identity` | [vadexplore/postprocess.py:149](vadexplore/postprocess.py#L149) |
@@ -620,7 +663,8 @@ scripts/               every runnable entry point
 configs/               train.yaml, train_aug.yaml, train_clean.yaml
 splits/                split.json, feature_stats.json  (committed, frozen)
 runs/                  per-run checkpoints, metrics, figures
-explore_out/           corpus_stats.json, silero_agreement.json, DATA_REPORT.md, figures/
-tests/                 300 tests
-DECISIONS.md           every default, the evidence, and where to change it
+explore_out/           corpus_stats.json, silero_agreement.json, figures/, examples/
+tests/                 299 tests
+tex_report/            Report.tex, Report.pdf: my write-up, every default and
+                       its evidence, and all reported results
 ```
