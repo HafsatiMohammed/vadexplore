@@ -142,6 +142,34 @@ below.
 
 ## 4. Live microphone demo
 
+### Recorded demos
+
+Two screen recordings of the streaming model running live, no setup required:
+
+| Demo | Model | Watch |
+|---|---|---|
+| Clean-trained | `causal_attn`, no augmentation | [video](https://drive.google.com/file/d/1Ij81wTB_7ZKpcd4bSbIuG_ZCQKxolOeT/view?usp=share_link) |
+| Augmented-trained | `causal_attn`, RIR + MUSAN augmentation | [video](https://drive.google.com/file/d/1OW06Zd0HRDSx0BCoe0Zidx-YYyoocdpP/view?usp=sharing) |
+
+The pair is the point. Both are the same `causal_attn` architecture with the
+same 1 s window, each at its own operational threshold; the only difference is
+what they saw during training. On the noisy test set my report measures the
+clean-trained model at **25.80 % EER** and 1327 false alarms per hour — it stops
+discriminating and calls almost everything speech, which is what finger snaps
+and table taps trigger in the video. The augmented model brings that to **6.89 %
+EER** and 159 FA/h, costing 0.49 EER points on clean audio (2.47 % → 2.96 %).
+See my report, §11 (*Robustness to noise and reverberation*) for the full table,
+and §13 (*Live streaming demo*) for the demo write-up.
+
+Reproduce them yourself:
+
+```bash
+python scripts/live_mic_vad.py --run runs/attn_pw_1s        # the clean-trained video
+python scripts/live_mic_vad.py --run runs/attn_augmented    # the augmented video
+```
+
+### Run it
+
 ```bash
 python scripts/live_mic_vad.py                                  # default runs/sweep_past_window/attn_pw_1s
 python scripts/live_mic_vad.py --run runs/attn_pw_1s --window-seconds 8
