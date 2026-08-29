@@ -91,6 +91,10 @@ def run_config(corpus):
     config["eval"]["early_stopping_patience"] = None
     config["model"]["dropout"] = 0.0
     config["model"]["attn_dropout"] = 0.0
+    # These tests exercise the loop's bookkeeping on a synthetic corpus. The
+    # shipped config turns augmentation on, which would reach for the external
+    # RIR and MUSAN banks; augmentation has its own tests in test_augment.py.
+    config["augment"]["enabled"] = False
     return config
 
 

@@ -30,10 +30,11 @@ from vadexplore.config import DataConfig
 from vadexplore.labels import make_labels
 from vadexplore.loader import load_clip, read_audio
 
-RIR_DIR = Path(os.path.expanduser(
-    "~/Documents/research_training/kws-augmentation-kit/rirs"))
-MUSAN_DIR = Path(os.path.expanduser(
-    "~/Documents/research_training/kws-augmentation-kit/musan"))
+# External corpora live wherever the user put them; these tests skip when the
+# path does not resolve, so point the env vars at your own copies to run them.
+RIR_DIR = Path(os.path.expanduser(os.environ.get("VADEXPLORE_RIR_DIR", "path/to/rirs")))
+MUSAN_DIR = Path(os.path.expanduser(os.environ.get("VADEXPLORE_MUSAN_DIR", "path/to/musan")))
+DATA_DIR = Path(os.path.expanduser(os.environ.get("VADEXPLORE_DATA_DIR", "path/to/vad_data")))
 
 needs_rirs = pytest.mark.skipif(not (RIR_DIR / "metadata.csv").exists(),
                                 reason="RIR bank not present")
@@ -185,9 +186,8 @@ def test_echo_category_is_refused():
 @needs_musan
 def test_augmentation_leaves_labels_identical():
     config = DataConfig()
-    clip = load_clip(Path(os.path.expanduser("~/Downloads/vad_data")) /
-                     "1447-130552-0010") if Path(os.path.expanduser(
-                         "~/Downloads/vad_data/1447-130552-0010.wav")).exists() else None
+    clip = (load_clip(DATA_DIR / "1447-130552-0010")
+            if (DATA_DIR / "1447-130552-0010.wav").exists() else None)
     if clip is None:
         pytest.skip("dataset not present")
 
